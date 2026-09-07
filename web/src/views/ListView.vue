@@ -16,6 +16,7 @@ import {
   sortNote,
   type ListFilters,
 } from '../lib/listFilters.js';
+import { MIN_LOADING_MS, remainingMs } from '../lib/pacing.js';
 import { crawlerLastRun, useServiceStatus } from '../lib/serviceStatus.js';
 
 /**
@@ -77,6 +78,12 @@ const staleStamp = computed(() =>
 const staleWhen = computed(() => stampHuman(crawlerLastRun(status.value)));
 const hoursWord = computed(() => plural(staleHours.value ?? 0, 'час', 'часа', 'часов'));
 
+/** Дожидается, пока заглушки отработают минимум (`MIN_LOADING_MS`). */
+function holdSkeletons(startedAt: number): Promise<void> {
+  const left = remainingMs(startedAt, performance.now(), MIN_LOADING_MS);
+  return left === 0 ? Promise.resolve() : new Promise((resolve) => setTimeout(resolve, left));
+}
+
 async function loadPage(next: number, append: boolean): Promise<void> {
   inFlight?.abort();
   const controller = new AbortController();
@@ -84,25 +91,37 @@ async function loadPage(next: number, append: boolean): Promise<void> {
 
   loading.value = true;
   failure.value = null;
+  // Монотонные часы: перевод системного времени не должен влиять на показ.
+  const startedAt = performance.now();
+  // Функцией, а не полем: между `await` запрос успевает быть отменённым, и
+  // сужение типа по прошлой проверке тут врало бы.
+  const cancelled = (): boolean => controller.signal.aborted;
+
   try {
     const result = await fetchGames(
       { ...filters.value, page: next, pageSize: PAGE_SIZE },
       controller.signal,
     );
+    if (cancelled()) return;
+    await holdSkeletons(startedAt);
+    if (cancelled()) return;
     items.value = append ? [...items.value, ...result.items] : result.items;
     total.value = result.total;
     page.value = result.page;
   } catch (err) {
-    if (controller.signal.aborted) return;
+    if (cancelled()) return;
     if (err instanceof ApiError && err.status === 400) {
       // Негодные параметры в адрес мог вписать только человек: чиним отбор
       // на умолчания и показываем список, а не экран ошибки.
       void router.replace({ name: 'list' });
       return;
     }
+    // Экран сбоя тоже не должен выскакивать поверх мигнувших заглушек.
+    await holdSkeletons(startedAt);
+    if (cancelled()) return;
     failure.value = err instanceof ApiError ? err : new ApiError(0, 'неизвестный сбой');
   } finally {
-    if (!controller.signal.aborted) {
+    if (!cancelled()) {
       loading.value = false;
       firstLoad.value = false;
     }
