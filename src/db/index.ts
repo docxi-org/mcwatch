@@ -1,4 +1,4 @@
-import { mkdirSync } from 'node:fs';
+import { existsSync, mkdirSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import Database from 'better-sqlite3';
 import { drizzle } from 'drizzle-orm/better-sqlite3';
@@ -45,5 +45,13 @@ export function createDb(path: string = env.DATABASE_PATH): DbHandle {
 
 /** Накатывает миграции на открытое соединение. */
 export function runMigrations(handle: DbHandle): void {
+  // Путь считается от файла модуля и одинаково разрешается из `src/` и из
+  // `dist/`, пока `dist/` лежит в корне проекта. Явная проверка — чтобы при
+  // смене раскладки сборки падать понятно, а не «no such table».
+  if (!existsSync(MIGRATIONS_DIR)) {
+    throw new Error(
+      `Каталог миграций не найден: ${MIGRATIONS_DIR}. Выполните \`pnpm db:generate\`.`,
+    );
+  }
   migrate(handle.db, { migrationsFolder: MIGRATIONS_DIR });
 }

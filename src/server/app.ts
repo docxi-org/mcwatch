@@ -1,5 +1,6 @@
 import { Hono } from 'hono';
 import { componentLogger } from '../config/logger.js';
+import { SERVICE_NAME } from '../config/service.js';
 
 const log = componentLogger('http');
 
@@ -18,7 +19,7 @@ export function createApp(): Hono {
   app.get('/api/health', (c) =>
     c.json({
       status: 'ok',
-      service: 'mcwatch',
+      service: SERVICE_NAME,
       uptimeS: Math.round(process.uptime()),
     }),
   );
