@@ -29,14 +29,21 @@ const crawlStamp = computed(() =>
         }}</span>
       </div>
       <!--
-        Из каталога на служебный экран ссылки нет: аудитории разные
-        (`ui/Спека.dc.html`). Обратная ссылка нужна — на мониторинг приходят
-        по прямому адресу.
+        Спека Claude Design ссылки из каталога на служебный экран не
+        предполагала: аудитории разные. Решение владельца 07.09.2026 —
+        поставить её в шапку: без входа мониторинг находится только по
+        прямому адресу, а это дополнительная часть ТЗ.
       -->
-      <RouterLink v-if="onMonitoring" class="head__back mono" :to="{ name: 'list' }"
-        >→ каталог</RouterLink
-      >
-      <span v-else-if="crawlStamp" class="head__stamp mono">обход: {{ crawlStamp }}</span>
+      <div class="head__right">
+        <span v-if="!onMonitoring && crawlStamp" class="head__stamp mono"
+          >обход: {{ crawlStamp }}</span
+        >
+        <RouterLink
+          class="head__link mono"
+          :to="{ name: onMonitoring ? 'list' : 'monitoring' }"
+          >{{ onMonitoring ? '← каталог' : 'мониторинг →' }}</RouterLink
+        >
+      </div>
     </header>
 
     <RouterView />
@@ -81,12 +88,28 @@ const crawlStamp = computed(() =>
   color: #85858d;
 }
 
+.head__right {
+  display: flex;
+  align-items: baseline;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+
 .head__stamp {
   font-size: 11px;
   color: var(--muted-2);
 }
 
-.head__back {
+/* Служебный вход: заметен тому, кто его ищет, и не спорит с каталогом. */
+.head__link {
   font-size: 11px;
+  min-height: 44px;
+  display: inline-flex;
+  align-items: center;
+  color: var(--muted);
+}
+
+.head__link:hover {
+  color: var(--accent);
 }
 </style>
