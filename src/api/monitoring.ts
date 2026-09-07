@@ -5,6 +5,10 @@ import { crawlState } from '../db/schema.js';
 import type { Monitor } from '../workers/monitor.js';
 import type { Scheduler } from '../workers/scheduler.js';
 import { utcDate } from '../db/repo/crawlState.js';
+import {
+  browseListPageUrl,
+  NEW_RELEASES_PAGE_URL,
+} from '../clients/metacritic/endpoints.js';
 import { letsplayOutcomes } from '../db/repo/letsplays.js';
 import { desc } from 'drizzle-orm';
 
@@ -46,6 +50,12 @@ export function createMonitoringRoutes(deps: MonitoringDeps): Hono {
             phase: state.phase,
             nextPage: state.nextPage,
             processedToday: state.date === today ? state.processedSlugs.length : 0,
+            // Адрес того, что возьмёт следующий заход: по номеру страницы
+            // человек источник не найдёт.
+            nextUrl:
+              state.phase === 'landing'
+                ? NEW_RELEASES_PAGE_URL
+                : browseListPageUrl(state.nextPage),
           }
         : null,
       cycleRunning: deps.scheduler?.isRunning ?? false,

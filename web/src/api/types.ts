@@ -35,6 +35,8 @@ export interface CrawlStateDto {
   phase: 'landing' | 'browse';
   nextPage: number;
   processedToday: number;
+  /** Адрес на Metacritic, который возьмёт следующий заход. */
+  nextUrl: string;
 }
 
 export interface EventDto {

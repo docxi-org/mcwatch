@@ -39,8 +39,8 @@ const STATE_TEXT: Record<WorkerStatusDto['state'], string> = {
  */
 function nextTargetText(crawl: CrawlStateDto): string {
   return crawl.phase === 'landing'
-    ? 'главная Metacritic, раздел New Releases'
-    : `страница ${crawl.nextPage} общего списка`;
+    ? 'раздел New Releases на главной Metacritic'
+    : `страница ${crawl.nextPage} списка всех игр Metacritic, сортировка «Новые»`;
 }
 
 const RUN_RESULT: Record<Exclude<RunOutcome, never>, { code: string; text: string; tone: string }> =
@@ -373,7 +373,14 @@ const quietJournal = computed(() => loaded.value && events.value.length === 0);
           </div>
           <div class="crawl__cell crawl__cell--wide">
             <span class="crawl__key mono">СЛЕДУЮЩИЙ ЗАХОД ВОЗЬМЁТ</span>
-            <span class="crawl__value">{{ nextTargetText(crawl) }}</span>
+            <!-- Ссылка на сам источник: по номеру страницы его не найти. -->
+            <a
+              class="crawl__value crawl__link"
+              :href="crawl.nextUrl"
+              target="_blank"
+              rel="noopener noreferrer"
+              >{{ nextTargetText(crawl) }} ↗</a
+            >
             <span class="crawl__note mono"
               >одна страница за заход · phase: {{ crawl.phase }} · nextPage:
               {{ crawl.nextPage }}</span
@@ -904,6 +911,16 @@ const quietJournal = computed(() => loaded.value && events.value.length === 0);
 .crawl__value {
   font-size: 15px;
   font-weight: 600;
+  line-height: 1.35;
+  text-wrap: pretty;
+}
+
+.crawl__link {
+  color: var(--accent);
+}
+
+.crawl__link:hover {
+  color: var(--accent-hi);
 }
 
 .crawl__note {

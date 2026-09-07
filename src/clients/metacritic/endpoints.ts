@@ -65,6 +65,21 @@ export function browsePageUrl(page: number, limit = BROWSE_PAGE_SIZE): string {
 }
 
 /**
+ * Человеческие страницы самого Metacritic — те же, что названы в ТЗ п.1 и п.2.
+ * Нужны интерфейсу, чтобы можно было открыть источник глазами, а не гадать по
+ * номеру страницы. Проверено 07.09.2026: все три отвечают 200 без редиректа.
+ */
+
+/** Раздел New Releases на главной странице игр (ТЗ п.1). */
+export const NEW_RELEASES_PAGE_URL = `${SITE_ORIGIN}/game/`;
+
+/** Страница списка всех игр, сортировка «Новые» — раздел SEE ALL (ТЗ п.2). */
+export function browseListPageUrl(page: number): string {
+  const base = `${SITE_ORIGIN}/browse/game/all/all/all-time/new/`;
+  return page > 1 ? `${base}?page=${page}` : base;
+}
+
+/**
  * Человеческая страница игры на самом Metacritic. Проверено 07.09.2026:
  * `/game/<slug>/` отвечает 200 без редиректа для всех проверенных игр.
  */

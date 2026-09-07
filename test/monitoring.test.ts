@@ -13,6 +13,10 @@ import {
 } from '../src/workers/monitor.js';
 import { Scheduler, type Stage } from '../src/workers/scheduler.js';
 import { createApp } from '../src/server/app.js';
+import {
+  browseListPageUrl,
+  NEW_RELEASES_PAGE_URL,
+} from '../src/clients/metacritic/endpoints.js';
 
 const log = pino({ level: 'silent' });
 
@@ -368,5 +372,23 @@ describe('GET /api/events (SSE)', () => {
 
     expect(await readFrame(reader)).toContain('свежая новость');
     await reader.cancel();
+  });
+});
+
+describe('адрес следующего захода', () => {
+  it('фаза landing ведёт на раздел New Releases (ТЗ п.1)', () => {
+    expect(NEW_RELEASES_PAGE_URL).toBe('https://www.metacritic.com/game/');
+  });
+
+  it('первая страница списка — без номера в адресе', () => {
+    expect(browseListPageUrl(1)).toBe(
+      'https://www.metacritic.com/browse/game/all/all/all-time/new/',
+    );
+  });
+
+  it('очередная страница списка всех игр, сортировка «Новые» (ТЗ п.2)', () => {
+    expect(browseListPageUrl(5)).toBe(
+      'https://www.metacritic.com/browse/game/all/all/all-time/new/?page=5',
+    );
   });
 });
