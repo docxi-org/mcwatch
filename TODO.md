@@ -1,0 +1,23 @@
+# TODO
+
+Открытая работа. ≤12 действий. Замысел — в `docs/ARCHITECTURE.md`.
+
+## Действия
+
+- [x] G1 · Скелет: pnpm, TS strict, Hono, Drizzle + миграции, pino, `pnpm check` зелёный на пустом проекте — **сделано 2026-09-07**, см. `READY.md`
+- [ ] G1 · Разведка Metacritic: снять точные URL и apiKey JSON-бэкенда, сохранить фикстуры (landing, browse p.1, карточка, critic/user reviews) в `test/fixtures/`
+- [ ] G1 · `clients/metacritic`: список New Releases, список browse по странице, карточка, отзывы; rate-limit, UA, тесты на фикстурах
+- [ ] G1 · Воркер `crawler` + `crawl_state` (ротация landing→browse, сброс по дате) + `pnpm crawl --once`
+- [ ] G2 · `clients/openrouter` (AI SDK) + воркер `summarizer` с правилом обновления
+- [ ] G2 · Эмбеддинги + похожие игры в `GET /api/games/:slug`
+- [ ] G3 · API списка/карточки/платформ; фронт Vue из Claude Design — список, карточка, фильтр, поиск, сортировка, похожие
+- [ ] G4 · Dockerfile, compose, Caddy, деплой на VPS, планировщик раз в час
+- [ ] G5 · `worker_status`, `events_log`, SSE, кнопка принудительного запуска
+- [ ] G6 · `clients/youtube` + воркер `letsplay` (субтитры → Whisper → заключение)
+- [ ] README: запуск, «как использовался ИИ», ограничения (шлак в browse, YouTube с VPS)
+
+## Ждут решения владельца
+
+- Название проекта и домен на VPS (в документах — `mcwatch`, заменяемо)
+- Конкретные модели: резюме / эмбеддинги / транскрипция (предложить на шаге G2 с ценами)
+- Прокси или куки для YouTube, если субтитры с VPS заблокируются (выяснится на G6)
