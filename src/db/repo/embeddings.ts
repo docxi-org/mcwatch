@@ -1,6 +1,7 @@
-import { eq, isNotNull, isNull } from 'drizzle-orm';
+import { eq, isNotNull, isNull, ne, or, sql } from 'drizzle-orm';
 import type { Db } from '../index.js';
 import { gamePlatforms, games } from '../schema.js';
+import { EMBEDDING_DIMENSIONS } from '../../config/models.js';
 import type { SimilarityCandidate } from '../../workers/similarity.js';
 
 /**
@@ -32,6 +33,9 @@ export interface PendingEmbedding {
  * нужно: сборщик обнуляет `embedding` сам, как только `description_hash`
  * изменился (см. `repo/games.ts`). Значит «нужен» = «его нет».
  */
+/** Сколько байт занимает вектор объявленной размерности: 4 байта на число. */
+const EXPECTED_BYTES = EMBEDDING_DIMENSIONS * 4;
+
 export function findGamesNeedingEmbedding(db: Db): PendingEmbedding[] {
   return db
     .select({
@@ -43,7 +47,11 @@ export function findGamesNeedingEmbedding(db: Db): PendingEmbedding[] {
       descriptionHash: games.descriptionHash,
     })
     .from(games)
-    .where(isNull(games.embedding))
+    // Вектор чужой размерности равносилен его отсутствию: косинус между
+    // векторами разной длины возвращает 0, и такие игры молча выпадают из
+    // похожих. Один раз это уже случилось — 07.09.2026 усечение до 1536
+    // разрезало базу надвое, и 21 игра осталась без единой похожей.
+    .where(or(isNull(games.embedding), ne(sql`length(${games.embedding})`, EXPECTED_BYTES)))
     .all();
 }
 

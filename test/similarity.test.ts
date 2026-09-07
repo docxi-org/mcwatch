@@ -11,7 +11,9 @@ import {
   encodeEmbedding,
   findGamesNeedingEmbedding,
   loadSimilarityPool,
+  saveEmbedding,
 } from '../src/db/repo/embeddings.js';
+import { EMBEDDING_DIMENSIONS } from '../src/config/models.js';
 import { upsertGame } from '../src/db/repo/games.js';
 import { asCall } from './llmCall.js';
 import { games } from '../src/db/schema.js';
@@ -196,11 +198,23 @@ const card = (slug: string, over: Partial<GameCard> = {}): GameCard => ({
   ...over,
 });
 
+/**
+ * Вектор настоящей длины: короткий воркер считает за отсутствующий и стал бы
+ * пересчитывать его вечно. Первые три числа несут различие между играми,
+ * остальные — нули.
+ */
+function fakeVector(i: number): Float32Array {
+  const v = new Float32Array(EMBEDDING_DIMENSIONS);
+  v[0] = i;
+  v[1] = 1;
+  return v;
+}
+
 function fakeEmbedder() {
   const batches: string[][] = [];
   const embed = vi.fn((texts: string[]) => {
     batches.push(texts);
-    return Promise.resolve(asCall(texts.map((_, i) => Float32Array.from([i, 1, 0]))));
+    return Promise.resolve(asCall(texts.map((_, i) => fakeVector(i))));
   });
   return { client: { embed } as unknown as OpenRouterClient, batches };
 }
@@ -269,7 +283,7 @@ describe('воркер эмбеддингов', () => {
         call++;
         return call === 1
           ? Promise.reject(new Error('провайдер лёг'))
-          : Promise.resolve(asCall(texts.map(() => Float32Array.from([1, 0, 0]))));
+          : Promise.resolve(asCall(texts.map(() => fakeVector(1))));
       }),
     } as unknown as OpenRouterClient;
 
@@ -319,5 +333,24 @@ describe('материал эмбеддинга', () => {
         descriptionHash: null,
       }),
     ).toBe('Игра');
+  });
+});
+
+describe('размерность вектора', () => {
+  it('вектор чужой длины считается отсутствующим, а не годным', () => {
+    upsertGame(handle.db, card('старый'), now);
+    // Так выглядела база до усечения: 2560 чисел вместо объявленных 1536.
+    handle.sqlite
+      .prepare('UPDATE games SET embedding = ? WHERE slug = ?')
+      .run(Buffer.alloc(2560 * 4), 'старый');
+
+    expect(findGamesNeedingEmbedding(handle.db).map((g) => g.slug)).toEqual(['старый']);
+  });
+
+  it('вектор объявленной длины пересчитывать не надо', () => {
+    upsertGame(handle.db, card('свежий'), now);
+    saveEmbedding(handle.db, 'свежий', new Float32Array(EMBEDDING_DIMENSIONS));
+
+    expect(findGamesNeedingEmbedding(handle.db)).toEqual([]);
   });
 });
