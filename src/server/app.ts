@@ -1,8 +1,11 @@
 import { Hono } from 'hono';
 import { createCatalogRoutes } from '../api/games.js';
+import { createMonitoringRoutes } from '../api/monitoring.js';
 import { componentLogger } from '../config/logger.js';
 import { SERVICE_NAME } from '../config/service.js';
 import type { Db } from '../db/index.js';
+import type { Monitor } from '../workers/monitor.js';
+import type { Scheduler } from '../workers/scheduler.js';
 
 const log = componentLogger('http');
 
@@ -10,7 +13,14 @@ const log = componentLogger('http');
  * Собирает Hono-приложение. Экспортируется отдельно от запуска слушателя,
  * чтобы тесты били по нему через `app.request()` без открытия порта.
  */
-export function createApp(db?: Db): Hono {
+export interface AppDeps {
+  db?: Db;
+  monitor?: Monitor;
+  scheduler?: Scheduler | null;
+}
+
+export function createApp(deps: AppDeps = {}): Hono {
+  const { db, monitor, scheduler } = deps;
   const app = new Hono();
 
   app.onError((err, c) => {
@@ -29,6 +39,9 @@ export function createApp(db?: Db): Hono {
   // Каталог подключается только когда есть БД: `/api/health` должен отвечать
   // и без неё, иначе проверка живости зависела бы от состояния хранилища.
   if (db) app.route('/api', createCatalogRoutes(db));
+  if (db && monitor) {
+    app.route('/api', createMonitoringRoutes({ db, monitor, scheduler: scheduler ?? null }));
+  }
 
   app.notFound((c) => c.json({ error: 'not_found' }, 404));
 

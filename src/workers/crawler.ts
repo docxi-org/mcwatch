@@ -22,6 +22,7 @@ import {
   type PlatformScores,
 } from '../db/repo/games.js';
 import { upsertReviews } from '../db/repo/reviews.js';
+import { nullReporter, type Reporter } from './monitor.js';
 
 /**
  * Воркер сбора — `docs/ARCHITECTURE.md` §2. Один заход = один список
@@ -34,6 +35,8 @@ export interface CrawlDeps {
   client: MetacriticClient;
   now?: () => Date;
   log?: Logger;
+  /** Куда докладывать о ходе работы. По умолчанию — никуда. */
+  reporter?: Reporter;
 }
 
 export interface CrawlFailure {
@@ -63,6 +66,9 @@ export interface CrawlResult {
  * получается сбалансированной и каждый отзыв приходит с достоверной меткой.
  */
 const USER_SENTIMENTS = ['positive', 'neutral', 'negative'] as const;
+
+/** Имя воркера в мониторинге. */
+export const WORKER = 'crawler';
 
 /**
  * Оценки по платформам. Metascore есть на карточке, а userscore приходится
@@ -191,12 +197,15 @@ export async function runCrawlOnce(deps: CrawlDeps): Promise<CrawlResult> {
   const { db, client } = deps;
   const now = deps.now ?? (() => new Date());
   const log = deps.log ?? componentLogger('crawler');
+  const report = deps.reporter ?? nullReporter;
 
+  report.started(WORKER);
   const date = utcDate(now());
   const state = loadOrCreateState(db, date);
   const target = planTarget(state);
 
   log.info({ date, target }, 'заход сбора начат');
+  report.log(WORKER, 'info', 'заход начат', { date, target });
 
   const { games: listed, skipped } = await fetchList(client, target);
 
@@ -218,6 +227,7 @@ export async function runCrawlOnce(deps: CrawlDeps): Promise<CrawlResult> {
   const touched: string[] = [];
 
   for (const item of todo) {
+    report.item(WORKER, item.title);
     try {
       const card = await client.getGameCard(item.slug);
       const platforms = await collectPlatformScores(client, card, log);
@@ -231,12 +241,15 @@ export async function runCrawlOnce(deps: CrawlDeps): Promise<CrawlResult> {
       }
 
       result.saved++;
+      report.processed(WORKER);
       log.debug({ slug: card.slug, platforms: platforms.length }, 'игра сохранена');
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);
       markGameFailed(db, item.slug, item.title, message, now());
       result.failed++;
       result.failures.push({ slug: item.slug, error: message });
+      report.failed(WORKER);
+      report.log(WORKER, 'warn', `игра не собрана: ${item.slug}`, { error: message });
       log.warn({ err, slug: item.slug }, 'игра не собрана, обход продолжается');
     }
     // Игра считается обработанной сегодня и при неудаче: иначе следующий заход
@@ -256,5 +269,11 @@ export async function runCrawlOnce(deps: CrawlDeps): Promise<CrawlResult> {
     },
     'заход сбора завершён',
   );
+  report.log(WORKER, 'info', 'заход завершён', {
+    saved: result.saved,
+    failed: result.failed,
+    reviews: result.reviewsWritten,
+  });
+  report.finished(WORKER);
   return result;
 }

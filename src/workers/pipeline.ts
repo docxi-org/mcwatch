@@ -7,6 +7,7 @@ import type { Db } from '../db/index.js';
 import { games } from '../db/schema.js';
 import { runCrawlOnce } from './crawler.js';
 import { runEmbedOnce } from './embedder.js';
+import { nullReporter, type Reporter } from './monitor.js';
 import { Scheduler, type Stage } from './scheduler.js';
 import { runSummarizeOnce } from './summarizer.js';
 
@@ -32,6 +33,7 @@ export interface PipelineOptions {
   db: Db;
   intervalMs?: number;
   log?: Logger;
+  reporter?: Reporter;
 }
 
 /**
@@ -39,13 +41,17 @@ export interface PipelineOptions {
  * моделью выключаются с предупреждением, а обход всё равно работает — сбор
  * данных не должен зависеть от наличия ключа.
  */
-export function createStages(db: Db, log: Logger): Stage[] {
+export function createStages(
+  db: Db,
+  log: Logger,
+  reporter: Reporter = nullReporter,
+): Stage[] {
   const metacritic = new MetacriticClient();
   const stages: Stage[] = [
     {
       name: 'crawl',
       run: async () => {
-        await runCrawlOnce({ db, client: metacritic, log });
+        await runCrawlOnce({ db, client: metacritic, log, reporter });
       },
     },
   ];
@@ -64,13 +70,13 @@ export function createStages(db: Db, log: Logger): Stage[] {
       {
         name: 'summarize',
         run: async () => {
-          await runSummarizeOnce({ db, client, log });
+          await runSummarizeOnce({ db, client, log, reporter });
         },
       },
       {
         name: 'embed',
         run: async () => {
-          await runEmbedOnce({ db, client, log });
+          await runEmbedOnce({ db, client, log, reporter });
         },
       },
     );
@@ -82,7 +88,7 @@ export function createStages(db: Db, log: Logger): Stage[] {
 export function createScheduler(opts: PipelineOptions): Scheduler {
   const log = opts.log ?? componentLogger('pipeline');
   return new Scheduler({
-    stages: createStages(opts.db, log),
+    stages: createStages(opts.db, log, opts.reporter ?? nullReporter),
     intervalMs: opts.intervalMs ?? HOUR_MS,
     lastRunAt: () => lastCrawlAt(opts.db),
     log,

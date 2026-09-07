@@ -98,7 +98,7 @@ beforeEach(() => {
   dir = mkdtempSync(join(tmpdir(), 'mcwatch-api-'));
   handle = createDb(join(dir, 'test.db'));
   runMigrations(handle);
-  app = createApp(handle.db);
+  app = createApp({ db: handle.db });
 });
 
 afterEach(() => {

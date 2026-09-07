@@ -12,6 +12,7 @@ import {
   upsertSummary,
   type RefreshReason,
 } from '../db/repo/summaries.js';
+import { nullReporter, type Reporter } from './monitor.js';
 import { selectForSummary } from './selectReviews.js';
 
 /**
@@ -22,6 +23,9 @@ import { selectForSummary } from './selectReviews.js';
 
 const KINDS: ReviewKind[] = ['critic', 'user'];
 
+/** Имя воркера в мониторинге. */
+export const WORKER = 'summarizer';
+
 export interface SummarizeDeps {
   db: Db;
   client: OpenRouterClient;
@@ -30,6 +34,7 @@ export interface SummarizeDeps {
   /** Ограничение на число резюме за прогон; без него — все, кому надо. */
   limit?: number;
   model?: string;
+  reporter?: Reporter;
 }
 
 export interface SummarizeResult {
@@ -106,7 +111,9 @@ export async function runSummarizeOnce(
   const now = deps.now ?? (() => new Date());
   const log = deps.log ?? componentLogger('summarizer');
   const model = deps.model ?? SUMMARY_MODEL;
+  const report = deps.reporter ?? nullReporter;
 
+  report.started(WORKER);
   const candidates = findCandidates(db);
   const result: SummarizeResult = {
     candidates: candidates.length,
@@ -130,6 +137,7 @@ export async function runSummarizeOnce(
       continue;
     }
 
+    report.item(WORKER, `${c.title} · ${c.kind}`);
     try {
       const list = loadReviews(db, c.slug, c.kind);
       // Отзывов нет — резюме нет: выдумывать нечего (CLAUDE.md).
@@ -149,11 +157,16 @@ export async function runSummarizeOnce(
       upsertSummary(db, c.slug, c.kind, summary, model, list.length, now());
       result.written++;
       result.reasons[reason] = (result.reasons[reason] ?? 0) + 1;
+      report.processed(WORKER);
       log.debug({ slug: c.slug, kind: c.kind, reason }, 'резюме сохранено');
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);
       result.failed++;
       result.failures.push({ slug: c.slug, kind: c.kind, error: message });
+      report.failed(WORKER);
+      report.log(WORKER, 'warn', `резюме не сделано: ${c.slug} · ${c.kind}`, {
+        error: message,
+      });
       log.warn({ err, slug: c.slug, kind: c.kind }, 'резюме не сделано, идём дальше');
     }
   }
@@ -162,5 +175,11 @@ export async function runSummarizeOnce(
     { written: result.written, upToDate: result.upToDate, failed: result.failed },
     'прогон резюме завершён',
   );
+  report.log(WORKER, 'info', 'прогон завершён', {
+    written: result.written,
+    upToDate: result.upToDate,
+    failed: result.failed,
+  });
+  report.finished(WORKER);
   return result;
 }

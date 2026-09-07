@@ -7,6 +7,7 @@ import {
   saveEmbedding,
   type PendingEmbedding,
 } from '../db/repo/embeddings.js';
+import { nullReporter, type Reporter } from './monitor.js';
 
 /**
  * Воркер эмбеддингов — `docs/ARCHITECTURE.md` §4.2. Считает вектор один раз;
@@ -17,11 +18,15 @@ import {
 /** Сколько текстов уходит за один вызов: меньше запросов при том же объёме. */
 const BATCH_SIZE = 16;
 
+/** Имя воркера в мониторинге. */
+export const WORKER = 'embedder';
+
 export interface EmbedDeps {
   db: Db;
   client: OpenRouterClient;
   log?: Logger;
   batchSize?: number;
+  reporter?: Reporter;
 }
 
 export interface EmbedResult {
@@ -53,7 +58,9 @@ export async function runEmbedOnce(deps: EmbedDeps): Promise<EmbedResult> {
   const { db, client } = deps;
   const log = deps.log ?? componentLogger('embedder');
   const size = deps.batchSize ?? BATCH_SIZE;
+  const report = deps.reporter ?? nullReporter;
 
+  report.started(WORKER);
   const pending = findGamesNeedingEmbedding(db);
   const result: EmbedResult = {
     pending: pending.length,
@@ -66,6 +73,7 @@ export async function runEmbedOnce(deps: EmbedDeps): Promise<EmbedResult> {
 
   for (const batch of chunk(pending, size)) {
     const slugs = batch.map((g) => g.slug);
+    report.item(WORKER, `пачка из ${batch.length}`);
     try {
       const vectors = await client.embed(batch.map(embeddingTextOf));
 
@@ -74,12 +82,15 @@ export async function runEmbedOnce(deps: EmbedDeps): Promise<EmbedResult> {
         if (!vector) continue;
         saveEmbedding(db, game.slug, vector);
         result.written++;
+        report.processed(WORKER);
       }
       log.debug({ slugs }, 'пачка эмбеддингов сохранена');
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);
       result.failed += batch.length;
       result.failures.push({ slugs, error: message });
+      report.failed(WORKER, batch.length);
+      report.log(WORKER, 'warn', 'пачка не посчитана', { slugs, error: message });
       log.warn({ err, slugs }, 'пачка не посчитана, идём дальше');
     }
   }
@@ -88,5 +99,10 @@ export async function runEmbedOnce(deps: EmbedDeps): Promise<EmbedResult> {
     { written: result.written, failed: result.failed },
     'прогон эмбеддингов завершён',
   );
+  report.log(WORKER, 'info', 'прогон завершён', {
+    written: result.written,
+    failed: result.failed,
+  });
+  report.finished(WORKER);
   return result;
 }

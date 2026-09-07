@@ -6,6 +6,7 @@ import { env } from '../config/env.js';
 import { componentLogger } from '../config/logger.js';
 import { SERVICE_NAME } from '../config/service.js';
 import { createDb, runMigrations } from '../db/index.js';
+import { Monitor } from '../workers/monitor.js';
 import { createScheduler } from '../workers/pipeline.js';
 import { createApp } from './app.js';
 
@@ -14,7 +15,17 @@ const log = componentLogger('server');
 const handle = createDb();
 runMigrations(handle);
 
-const app = createApp(handle.db);
+const monitor = new Monitor(handle.db);
+
+const scheduler = env.SCHEDULER_ENABLED
+  ? createScheduler({
+      db: handle.db,
+      intervalMs: env.SCHEDULER_INTERVAL_MIN * 60 * 1000,
+      reporter: monitor,
+    })
+  : null;
+
+const app = createApp({ db: handle.db, monitor, scheduler });
 
 /**
  * Собранный фронт отдаётся тем же процессом (CLAUDE.md). Пока его нет —
@@ -29,13 +40,6 @@ if (existsSync(webDist)) {
 } else {
   log.info({ webDist }, 'сборки фронта нет, отдаётся только API');
 }
-
-const scheduler = env.SCHEDULER_ENABLED
-  ? createScheduler({
-      db: handle.db,
-      intervalMs: env.SCHEDULER_INTERVAL_MIN * 60 * 1000,
-    })
-  : null;
 
 if (scheduler) scheduler.start();
 else log.warn('планировщик выключен переменной SCHEDULER_ENABLED');
