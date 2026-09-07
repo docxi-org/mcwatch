@@ -353,7 +353,10 @@ const quietJournal = computed(() => loaded.value && events.value.length === 0);
       </section>
 
       <section class="section section--gap">
-        <h2 class="section__title">Обход</h2>
+        <div class="section__head">
+          <h2 class="section__title">Обход</h2>
+          <span class="section__note">к источнику не чаще одного запроса в секунду</span>
+        </div>
         <div v-if="crawl" class="crawl">
           <div class="crawl__cell">
             <span class="crawl__key mono">ДАТА СБОРА</span>
@@ -368,7 +371,7 @@ const quietJournal = computed(() => loaded.value && events.value.length === 0);
           <div class="crawl__cell">
             <span class="crawl__key mono">СЛЕДУЮЩАЯ СТРАНИЦА</span>
             <span class="crawl__value">{{ crawl.nextPage }}</span>
-            <span class="crawl__note mono">не чаще одного запроса в секунду</span>
+            <span class="crawl__note mono">с неё начнётся следующий заход</span>
           </div>
           <div class="crawl__cell">
             <span class="crawl__key mono">ОБРАБОТАНО ЗА ДЕНЬ</span>
