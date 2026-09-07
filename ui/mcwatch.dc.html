@@ -1,0 +1,930 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Sora:wght@400;600;700;800&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+<style>
+  html, body { margin: 0; padding: 0; background: #0c0c0d; }
+  body { font-family: 'Sora', system-ui, sans-serif; -webkit-font-smoothing: antialiased; }
+  a { color: oklch(0.78 0.13 205); text-decoration: none; }
+  a:hover { color: oklch(0.88 0.10 205); }
+  ::selection { background: oklch(0.78 0.13 205); color: #0c0c0d; }
+  :focus-visible { outline: 2px solid oklch(0.78 0.13 205); outline-offset: 3px; border-radius: 4px; }
+  input, select, button { font-family: inherit; }
+  input::placeholder { color: #6a6a70; }
+  @keyframes shine { 0% { background-position: 100% 0; } 100% { background-position: -100% 0; } }
+  .hatch { background-image: repeating-linear-gradient(135deg, rgba(255,255,255,0.045) 0 1px, transparent 1px 7px); }
+  .noscroll::-webkit-scrollbar { height: 6px; }
+  .noscroll::-webkit-scrollbar-thumb { background: #2c2c31; border-radius: 3px; }
+</style>
+</helmet>
+
+<div style="min-height: 100vh; background: #0c0c0d; color: #edeef0; padding-bottom: 80px">
+
+  <sc-if value="{{ showBar }}" hint-placeholder-val="{{ true }}">
+    <div style="position: sticky; top: 0; z-index: 50; display: flex; flex-wrap: wrap; align-items: center; gap: 8px 18px; padding: 9px 16px; background: #17171a; border-bottom: 1px solid #26262b; font-family: 'JetBrains Mono', monospace; font-size: 11px; color: #8b8b93">
+      <span style="display: flex; align-items: center; gap: 7px; color: #cfd0d4; letter-spacing: 0.04em">
+        <span style="width: 7px; height: 7px; border-radius: 2px; background: oklch(0.78 0.13 205)"></span>МАКЕТ
+      </span>
+
+      <label style="display: flex; align-items: center; gap: 7px">СОСТОЯНИЕ
+        <select value="{{ scenario }}" onChange="{{ setScenario }}" style="background: #202025; color: #edeef0; border: 1px solid #33333a; border-radius: 5px; padding: 4px 7px; font-size: 11px; max-width: 260px">
+          <sc-for list="{{ scenarios }}" as="s" hint-placeholder-count="4">
+            <option value="{{ s.id }}">{{ s.name }}</option>
+          </sc-for>
+        </select>
+      </label>
+
+      <span style="display: flex; align-items: center; gap: 6px">ШИРИНА
+        <sc-for list="{{ vpOptions }}" as="v" hint-placeholder-count="3">
+          <button onClick="{{ v.pick }}" style="cursor: pointer; border-radius: 5px; padding: 4px 8px; font-size: 11px; border: 1px solid {{ v.bc }}; background: {{ v.bg }}; color: {{ v.fg }}">{{ v.label }}</button>
+        </sc-for>
+      </span>
+
+      <span style="margin-left: auto; padding: 4px 9px; border-radius: 5px; background: #101013; border: 1px solid #26262b; color: #79a9b8; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 46%">{{ url }}</span>
+    </div>
+  </sc-if>
+
+  <div style="width: {{ vpWidth }}; margin: 0 auto; padding: 0 16px; box-sizing: border-box">
+
+    <header style="display: flex; align-items: baseline; justify-content: space-between; gap: 16px; flex-wrap: wrap; padding: 26px 0 22px; border-bottom: 1px solid #1e1e22">
+      <div style="display: flex; align-items: baseline; gap: 12px; flex-wrap: wrap">
+        <span onClick="{{ goList }}" style="cursor: pointer; font-size: 25px; font-weight: 800; letter-spacing: -0.03em; color: #f4f5f7">mcwatch<span style="color: oklch(0.78 0.13 205)">.</span></span>
+        <span style="font-size: 13px; color: #85858d">каталог новых релизов с Metacritic</span>
+      </div>
+      <span style="font-family: 'JetBrains Mono', monospace; font-size: 11px; color: #6f6f77">обход: 07.09.2026 13:00</span>
+    </header>
+
+    <sc-if value="{{ onList }}" hint-placeholder-val="{{ true }}">
+      <div>
+        <sc-if value="{{ stale }}">
+          <div role="status" style="display: flex; gap: 12px; align-items: flex-start; margin: 20px 0 0; padding: 13px 15px; border-radius: 9px; background: rgba(190,150,40,0.08); border: 1px solid oklch(0.5 0.09 92)">
+            <span style="flex: none; font-family: 'JetBrains Mono', monospace; font-size: 10px; letter-spacing: 0.06em; padding: 3px 6px; border-radius: 4px; background: oklch(0.82 0.16 92); color: #17130a">33 Ч</span>
+            <span style="font-size: 13.5px; color: #ddc9a3; line-height: 1.55; text-wrap: pretty">{{ staleText }}</span>
+          </div>
+        </sc-if>
+
+        <div style="display: flex; flex-wrap: wrap; align-items: center; gap: 10px; padding: 20px 0 14px">
+          <div style="position: relative; flex: 1 1 240px; min-width: 0">
+            <input value="{{ q }}" onInput="{{ setQ }}" type="search" aria-label="Поиск игры по названию" placeholder="поиск по названию" style="width: 100%; box-sizing: border-box; background: #151518; border: 1px solid #2a2a30; border-radius: 8px; padding: 11px 13px; color: #edeef0; font-size: 14px; outline: none" style-focus="border-color: oklch(0.78 0.13 205)">
+          </div>
+          <div role="group" aria-label="Сортировка списка" class="noscroll" style="display: flex; gap: 4px; padding: 3px; max-width: 100%; overflow-x: auto; background: #151518; border: 1px solid #2a2a30; border-radius: 8px">
+            <sc-for list="{{ sorts }}" as="s" hint-placeholder-count="4">
+              <button onClick="{{ s.pick }}" aria-pressed="{{ s.active }}" style="cursor: pointer; border: none; border-radius: 6px; min-height: 44px; padding: 0 13px; font-size: 12.5px; white-space: nowrap; background: {{ s.bg }}; color: {{ s.fg }}">{{ s.label }}</button>
+            </sc-for>
+          </div>
+        </div>
+
+        <div class="noscroll" role="group" aria-label="Фильтр по платформе" style="display: flex; gap: 7px; overflow-x: auto; padding-bottom: 14px">
+          <sc-for list="{{ platformChips }}" as="p" hint-placeholder-count="5">
+            <button onClick="{{ p.pick }}" aria-pressed="{{ p.active }}" style="cursor: pointer; flex: none; display: flex; align-items: center; gap: 7px; border-radius: 999px; min-height: 44px; padding: 0 16px; font-size: 13px; border: 1px solid {{ p.bc }}; background: {{ p.bg }}; color: {{ p.fg }}">{{ p.platform }}<span style="font-family: 'JetBrains Mono', monospace; font-size: 10.5px; opacity: 0.65">{{ p.gameCount }}</span></button>
+          </sc-for>
+        </div>
+
+        <sc-if value="{{ hasResults }}" hint-placeholder-val="{{ true }}">
+          <div>
+            <div style="display: flex; align-items: baseline; justify-content: space-between; gap: 12px; font-family: 'JetBrains Mono', monospace; font-size: 11px; color: #6f6f77; padding: 4px 0 14px">
+              <span>{{ countText }}</span>
+              <span>{{ sortNote }}</span>
+            </div>
+
+            <div style="display: grid; grid-template-columns: repeat({{ cols }}, minmax(0, 1fr)); gap: 16px">
+              <sc-for list="{{ cards }}" as="g" hint-placeholder-count="10">
+                <div onClick="{{ g.open }}" onKeyDown="{{ g.key }}" role="button" tabIndex="0" aria-label="{{ g.aria }}" style="cursor: pointer; display: flex; flex-direction: column; background: #141417; border: 1px solid #232328; border-radius: 11px; overflow: hidden" style-hover="border-color: #3d3d45">
+                  <div class="hatch" style="position: relative; aspect-ratio: 3 / 4; background-color: #1b1b20; display: grid; place-items: center; padding: 12px; text-align: center; border-bottom: 1px solid #232328">
+                    <sc-if value="{{ g.hasCover }}" hint-placeholder-val="{{ true }}">
+                      <span style="font-family: 'JetBrains Mono', monospace; font-size: 10px; color: #63636b; letter-spacing: 0.04em; line-height: 1.6">обложка 300×400<br>loading=lazy</span>
+                    </sc-if>
+                    <sc-if value="{{ g.noCover }}">
+                      <span style="display: flex; flex-direction: column; gap: 8px; align-items: center">
+                        <span style="font-size: 15px; font-weight: 700; line-height: 1.25; color: #b9bac0; text-wrap: pretty">{{ g.title }}</span>
+                        <span style="font-family: 'JetBrains Mono', monospace; font-size: 9.5px; color: #6f6f77; letter-spacing: 0.06em">{{ g.coverNote }}</span>
+                      </span>
+                    </sc-if>
+                    <sc-if value="{{ g.failed }}">
+                      <span style="position: absolute; top: 9px; left: 9px; font-family: 'JetBrains Mono', monospace; font-size: 9.5px; letter-spacing: 0.06em; padding: 4px 7px; border-radius: 5px; background: rgba(12,12,13,0.86); border: 1px solid oklch(0.62 0.2 25); color: oklch(0.78 0.15 25)">ДАННЫЕ НЕПОЛНЫЕ</span>
+                    </sc-if>
+                  </div>
+
+                  <div style="display: flex; flex-direction: column; gap: 9px; padding: 13px 13px 14px">
+                    <span style="font-size: 15px; font-weight: 600; line-height: 1.3; letter-spacing: -0.01em; text-wrap: pretty">{{ g.title }}</span>
+                    <span style="display: flex; flex-direction: column; gap: 3px; font-family: 'JetBrains Mono', monospace; font-size: 10.5px; color: #7d7d85">
+                      <span>{{ g.dateText }}</span>
+                      <span>{{ g.dev }}</span>
+                    </span>
+                    <sc-if value="{{ g.hasGenres }}" hint-placeholder-val="{{ true }}">
+                      <div style="display: flex; flex-wrap: wrap; gap: 5px">
+                        <sc-for list="{{ g.genres }}" as="genre" hint-placeholder-count="1">
+                          <span style="font-size: 11px; color: #a9aab1; background: #1e1e23; border-radius: 5px; padding: 3px 7px">{{ genre }}</span>
+                        </sc-for>
+                      </div>
+                    </sc-if>
+                    <sc-if value="{{ g.noGenres }}">
+                      <span style="font-family: 'JetBrains Mono', monospace; font-size: 10px; color: #64646c">жанры не указаны</span>
+                    </sc-if>
+                    <span style="font-size: 11.5px; color: #6f6f77; line-height: 1.4">{{ g.platformsText }}</span>
+                    <div style="display: flex; gap: 12px; padding-top: 3px; margin-top: auto">
+                      <div style="display: flex; flex-direction: column; align-items: center; gap: 5px">
+                        <div style="display: grid; place-items: center; font-family: 'JetBrains Mono', monospace; font-weight: 700; line-height: 1; height: 40px; min-width: 40px; padding: {{ g.ms.pad }}; font-size: {{ g.ms.fs }}; border-radius: {{ g.ms.r }}; background: {{ g.ms.bg }}; color: {{ g.ms.fg }}; border: 2px {{ g.ms.bs }} {{ g.ms.bc }}">
+                          <span>{{ g.ms.val }}<span style="font-size: 9px; font-weight: 500; opacity: 0.6">{{ g.ms.suffix }}</span></span>
+                        </div>
+                        <div style="width: 100%; height: 3px; border-radius: 2px; background: {{ g.ms.trackBg }}">
+                          <div style="height: 3px; border-radius: 2px; background: {{ g.ms.barBg }}; width: {{ g.ms.barW }}"></div>
+                        </div>
+                        <span style="font-family: 'JetBrains Mono', monospace; font-size: 9px; letter-spacing: 0.05em; color: #74747c; white-space: nowrap">{{ g.ms.labelShort }}</span>
+                      </div>
+                      <div style="display: flex; flex-direction: column; align-items: center; gap: 5px">
+                        <div style="display: grid; place-items: center; font-family: 'JetBrains Mono', monospace; font-weight: 700; line-height: 1; height: 40px; min-width: 40px; padding: {{ g.us.pad }}; font-size: {{ g.us.fs }}; border-radius: {{ g.us.r }}; background: {{ g.us.bg }}; color: {{ g.us.fg }}; border: 2px {{ g.us.bs }} {{ g.us.bc }}">
+                          <span>{{ g.us.val }}<span style="font-size: 9px; font-weight: 500; opacity: 0.6">{{ g.us.suffix }}</span></span>
+                        </div>
+                        <div style="width: 100%; height: 3px; border-radius: 2px; background: {{ g.us.trackBg }}">
+                          <div style="height: 3px; border-radius: 2px; background: {{ g.us.barBg }}; width: {{ g.us.barW }}"></div>
+                        </div>
+                        <span style="font-family: 'JetBrains Mono', monospace; font-size: 9px; letter-spacing: 0.05em; color: #74747c; white-space: nowrap">{{ g.us.labelShort }}</span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </sc-for>
+
+              <sc-for list="{{ skeletons }}" as="sk" hint-placeholder-count="0">
+                <div style="display: flex; flex-direction: column; background: #121215; border: 1px solid #1e1e22; border-radius: 11px; overflow: hidden">
+                  <div style="aspect-ratio: 3 / 4; background: linear-gradient(100deg, #17171b 30%, #202027 50%, #17171b 70%); background-size: 300% 100%; animation: shine 1.3s linear infinite"></div>
+                  <div style="display: flex; flex-direction: column; gap: 8px; padding: 13px">
+                    <span style="height: 12px; width: 80%; border-radius: 4px; background: #1e1e23"></span>
+                    <span style="height: 9px; width: 55%; border-radius: 4px; background: #1a1a1e"></span>
+                    <span style="height: 9px; width: 40%; border-radius: 4px; background: #1a1a1e"></span>
+                    <span style="height: 34px; width: 90px; border-radius: 6px; background: #1a1a1e; margin-top: 6px"></span>
+                  </div>
+                </div>
+              </sc-for>
+            </div>
+
+            <sc-if value="{{ showMore }}">
+              <div style="display: flex; justify-content: center; padding: 28px 0 0">
+                <button onClick="{{ loadMore }}" style="cursor: pointer; border: 1px solid #35353d; background: #1c1c21; color: #edeef0; border-radius: 9px; padding: 12px 20px; font-size: 13.5px" style-hover="border-color: oklch(0.78 0.13 205)">{{ moreText }}</button>
+              </div>
+            </sc-if>
+
+            <sc-if value="{{ allShown }}">
+              <div style="text-align: center; font-family: 'JetBrains Mono', monospace; font-size: 11px; color: #5f5f67; padding: 34px 0 0">это все игры по текущему отбору</div>
+            </sc-if>
+          </div>
+        </sc-if>
+
+        <sc-if value="{{ noResults }}">
+          <div style="display: flex; flex-direction: column; align-items: center; gap: 12px; text-align: center; padding: 84px 20px; border: 1px dashed #2c2c33; border-radius: 12px; margin-top: 8px">
+            <span style="font-size: 19px; font-weight: 600">{{ noResultsTitle }}</span>
+            <span style="font-size: 14px; color: #8b8b93; max-width: 420px; line-height: 1.55">{{ noResultsNote }}</span>
+            <button onClick="{{ reset }}" style="cursor: pointer; margin-top: 6px; border: 1px solid #35353d; background: #1c1c21; color: #edeef0; border-radius: 8px; padding: 9px 15px; font-size: 13px" style-hover="border-color: oklch(0.78 0.13 205)">Сбросить отбор</button>
+          </div>
+        </sc-if>
+
+        <sc-if value="{{ emptyDb }}">
+          <div style="display: flex; flex-direction: column; align-items: center; gap: 12px; text-align: center; padding: 90px 20px; border: 1px dashed #2c2c33; border-radius: 12px; margin-top: 8px">
+            <span style="font-size: 20px; font-weight: 600">База пока пуста</span>
+            <span style="font-size: 14px; color: #8b8b93; max-width: 440px; line-height: 1.55">Сервис обходит Metacritic раз в час. Первые игры появятся в каталоге сразу после удачного обхода.</span>
+            <span style="font-family: 'JetBrains Mono', monospace; font-size: 11px; color: #5f5f67; margin-top: 4px">последний обход: ещё не было</span>
+          </div>
+        </sc-if>
+      </div>
+    </sc-if>
+
+    <sc-if value="{{ onGame }}">
+      <div style="padding: 20px 0 0">
+        <button onClick="{{ goList }}" style="cursor: pointer; display: inline-flex; align-items: center; gap: 8px; background: none; border: none; padding: 0; margin-bottom: 20px; font-family: 'JetBrains Mono', monospace; font-size: 11.5px; color: #8b8b93" style-hover="color: oklch(0.82 0.12 205)">← ко всем играм</button>
+
+        <sc-if value="{{ game.failed }}">
+          <div style="display: flex; gap: 11px; align-items: flex-start; padding: 12px 14px; margin-bottom: 20px; border-radius: 9px; background: rgba(180,60,40,0.09); border: 1px solid oklch(0.45 0.11 25)">
+            <span style="font-family: 'JetBrains Mono', monospace; font-size: 10px; letter-spacing: 0.06em; padding: 3px 6px; border-radius: 4px; background: oklch(0.62 0.2 25); color: #17070a; flex: none">FAILED</span>
+            <span style="font-size: 13px; color: #d8b6ae; line-height: 1.5">Последний обход этой игры не удался — часть данных может быть устаревшей или отсутствовать.</span>
+          </div>
+        </sc-if>
+
+        <div style="display: grid; grid-template-columns: {{ detailCols }}; gap: 28px; align-items: start">
+          <div style="display: flex; flex-direction: column; gap: 16px">
+            <div class="hatch" style="aspect-ratio: 3 / 4; background-color: #1b1b20; border: 1px solid #232328; border-radius: 12px; display: grid; place-items: center; padding: 16px; text-align: center">
+              <sc-if value="{{ game.hasCover }}" hint-placeholder-val="{{ true }}">
+                <span style="font-family: 'JetBrains Mono', monospace; font-size: 11px; color: #63636b; letter-spacing: 0.04em; line-height: 1.7">обложка<br>оригинал с metacritic.com<br>loading=lazy</span>
+              </sc-if>
+              <sc-if value="{{ game.noCover }}">
+                <span style="display: flex; flex-direction: column; gap: 10px; align-items: center">
+                  <span style="font-size: 22px; font-weight: 700; line-height: 1.2; color: #b9bac0; text-wrap: pretty">{{ game.title }}</span>
+                  <span style="font-family: 'JetBrains Mono', monospace; font-size: 10px; color: #6f6f77; letter-spacing: 0.06em; text-align: center; line-height: 1.5">{{ game.coverNote }}</span>
+                </span>
+              </sc-if>
+            </div>
+
+            <div style="display: flex; flex-direction: column; gap: 1px; border: 1px solid #232328; border-radius: 10px; overflow: hidden">
+              <sc-for list="{{ game.facts }}" as="f" hint-placeholder-count="4">
+                <div style="display: flex; justify-content: space-between; gap: 12px; padding: 10px 13px; background: #141417">
+                  <span style="font-family: 'JetBrains Mono', monospace; font-size: 10.5px; letter-spacing: 0.04em; color: #74747c; flex: none">{{ f.k }}</span>
+                  <span style="font-size: 12.5px; color: #d5d6db; text-align: right">{{ f.v }}</span>
+                </div>
+              </sc-for>
+            </div>
+
+            <sc-if value="{{ game.hasVideo }}">
+              <div style="display: flex; flex-direction: column; gap: 8px">
+                <div onClick="{{ openVideo }}" onKeyDown="{{ openVideoKey }}" role="button" tabIndex="0" aria-label="Смотреть трейлер" class="hatch" style="cursor: pointer; position: relative; aspect-ratio: 16 / 9; background-color: #1b1b20; border: 1px solid #232328; border-radius: 10px; display: grid; place-items: center" style-hover="border-color: oklch(0.78 0.13 205)">
+                  <span style="display: grid; place-items: center; width: 46px; height: 46px; border-radius: 999px; background: rgba(12,12,13,0.7); border: 1px solid #3a3a42">
+                    <span style="width: 0; height: 0; border-left: 12px solid #e6e7ea; border-top: 8px solid transparent; border-bottom: 8px solid transparent; margin-left: 3px"></span>
+                  </span>
+                </div>
+                <span style="font-family: 'JetBrains Mono', monospace; font-size: 10px; color: #6f6f77">трейлер · откроется в модальном окне</span>
+              </div>
+            </sc-if>
+          </div>
+
+          <div style="display: flex; flex-direction: column; gap: 30px; min-width: 0">
+            <div style="display: flex; flex-direction: column; gap: 16px">
+              <h1 style="margin: 0; font-size: {{ titleSize }}; font-weight: 700; letter-spacing: -0.025em; line-height: 1.1; text-wrap: pretty">{{ game.title }}</h1>
+              <sc-if value="{{ game.hasGenres }}" hint-placeholder-val="{{ true }}">
+                <div style="display: flex; flex-wrap: wrap; gap: 6px">
+                  <sc-for list="{{ game.genres }}" as="genre" hint-placeholder-count="2">
+                    <span style="font-size: 12px; color: #a9aab1; background: #1e1e23; border-radius: 6px; padding: 5px 9px">{{ genre }}</span>
+                  </sc-for>
+                </div>
+              </sc-if>
+              <sc-if value="{{ game.noGenres }}">
+                <span style="font-family: 'JetBrains Mono', monospace; font-size: 11px; color: #64646c">жанры Metacritic не указал</span>
+              </sc-if>
+
+              <div style="display: flex; flex-wrap: wrap; gap: 10px; padding-top: 4px">
+                <div style="display: flex; align-items: center; gap: 13px; padding: 13px 16px; background: #141417; border: 1px solid #232328; border-radius: 11px">
+                  <div style="display: flex; flex-direction: column; align-items: center; gap: 6px">
+                    <div style="display: grid; place-items: center; font-family: 'JetBrains Mono', monospace; font-weight: 700; line-height: 1; height: 52px; min-width: 52px; padding: {{ game.ms.pad }}; font-size: {{ game.ms.fsBig }}; border-radius: {{ game.ms.rBig }}; background: {{ game.ms.bg }}; color: {{ game.ms.fg }}; border: 2px {{ game.ms.bs }} {{ game.ms.bc }}">
+                      <span>{{ game.ms.val }}<span style="font-size: 11px; font-weight: 500; opacity: 0.6">{{ game.ms.suffix }}</span></span>
+                    </div>
+                    <div style="width: 100%; height: 3px; border-radius: 2px; background: {{ game.ms.trackBg }}">
+                      <div style="height: 3px; border-radius: 2px; background: {{ game.ms.barBg }}; width: {{ game.ms.barW }}"></div>
+                    </div>
+                  </div>
+                  <span style="display: flex; flex-direction: column; gap: 3px">
+                    <span style="font-size: 13px; font-weight: 600">Критики</span>
+                    <span style="font-family: 'JetBrains Mono', monospace; font-size: 10px; color: #74747c">метаскор · шкала 0–100</span>
+                    <span style="font-family: 'JetBrains Mono', monospace; font-size: 10px; color: #74747c">{{ game.criticNote }}</span>
+                  </span>
+                </div>
+                <div style="display: flex; align-items: center; gap: 13px; padding: 13px 16px; background: #141417; border: 1px solid #232328; border-radius: 11px">
+                  <div style="display: flex; flex-direction: column; align-items: center; gap: 6px">
+                    <div style="display: grid; place-items: center; font-family: 'JetBrains Mono', monospace; font-weight: 700; line-height: 1; height: 52px; min-width: 52px; padding: {{ game.us.pad }}; font-size: {{ game.us.fsBig }}; border-radius: {{ game.us.rBig }}; background: {{ game.us.bg }}; color: {{ game.us.fg }}; border: 2px {{ game.us.bs }} {{ game.us.bc }}">
+                      <span>{{ game.us.val }}<span style="font-size: 11px; font-weight: 500; opacity: 0.6">{{ game.us.suffix }}</span></span>
+                    </div>
+                    <div style="width: 100%; height: 3px; border-radius: 2px; background: {{ game.us.trackBg }}">
+                      <div style="height: 3px; border-radius: 2px; background: {{ game.us.barBg }}; width: {{ game.us.barW }}"></div>
+                    </div>
+                  </div>
+                  <span style="display: flex; flex-direction: column; gap: 3px">
+                    <span style="font-size: 13px; font-weight: 600">Игроки</span>
+                    <span style="font-family: 'JetBrains Mono', monospace; font-size: 10px; color: #74747c">оценка игроков · шкала 0–10</span>
+                    <span style="font-family: 'JetBrains Mono', monospace; font-size: 10px; color: #74747c">{{ game.userNote }}</span>
+                  </span>
+                </div>
+              </div>
+              <span style="font-family: 'JetBrains Mono', monospace; font-size: 10px; color: #5f5f67">лучшие значения среди платформ · по каждой платформе оценки свои</span>
+            </div>
+
+            <div style="display: flex; flex-direction: column; gap: 10px">
+              <sc-if value="{{ game.hasDesc }}" hint-placeholder-val="{{ true }}">
+                <p style="margin: 0; font-size: 15px; line-height: 1.65; color: #c8c9cf; max-width: 62ch; text-wrap: pretty">{{ game.desc }}</p>
+              </sc-if>
+              <sc-if value="{{ game.noDesc }}">
+                <div style="display: flex; align-items: center; gap: 10px; padding: 13px 15px; border: 1px dashed #2c2c33; border-radius: 9px">
+                  <span style="font-size: 13.5px; color: #8b8b93">Описание Metacritic не публикует</span>
+                </div>
+              </sc-if>
+            </div>
+
+            <div style="display: flex; flex-direction: column; gap: 12px">
+              <div style="display: flex; align-items: baseline; justify-content: space-between; gap: 12px">
+                <h2 style="margin: 0; font-size: 17px; font-weight: 600; letter-spacing: -0.01em">Оценки по платформам</h2>
+                <span style="font-family: 'JetBrains Mono', monospace; font-size: 10px; color: #5f5f67">две шкалы, не сравнимы между собой</span>
+              </div>
+              <div style="display: flex; flex-direction: column; gap: 1px; border: 1px solid #232328; border-radius: 10px; overflow: hidden">
+                <div style="display: flex; gap: 10px; padding: 9px 13px; background: #1a1a1e; font-family: 'JetBrains Mono', monospace; font-size: 9.5px; letter-spacing: 0.05em; color: #74747c">
+                  <span style="flex: 1 1 auto; min-width: 0">ПЛАТФОРМА</span>
+                  <span style="flex: none; width: 92px; text-align: center">КРИТИКИ 0–100</span>
+                  <span style="flex: none; width: 84px; text-align: center">ИГРОКИ 0–10</span>
+                </div>
+                <sc-for list="{{ game.platformRows }}" as="row" hint-placeholder-count="3">
+                  <div style="display: flex; align-items: center; gap: 10px; padding: 11px 13px; background: #141417">
+                    <span style="flex: 1 1 auto; min-width: 0; font-size: 13.5px; font-weight: 500">{{ row.platform }}</span>
+                    <span style="flex: none; width: 92px; display: flex; flex-direction: column; align-items: center; gap: 3px">
+                      <sc-if value="{{ row.ms.has }}" hint-placeholder-val="{{ true }}">
+                        <span style="display: flex; flex-direction: column; align-items: center; gap: 4px">
+                          <span style="display: grid; place-items: center; font-family: 'JetBrains Mono', monospace; font-weight: 700; line-height: 1; height: 32px; min-width: 32px; padding: {{ row.ms.pad }}; font-size: 14px; border-radius: {{ row.ms.r }}; background: {{ row.ms.bg }}; color: {{ row.ms.fg }}; border: 2px {{ row.ms.bs }} {{ row.ms.bc }}">
+                            <span>{{ row.ms.val }}<span style="font-size: 8.5px; font-weight: 500; opacity: 0.6">{{ row.ms.suffix }}</span></span>
+                          </span>
+                          <span style="width: 62px; height: 3px; border-radius: 2px; background: {{ row.ms.trackBg }}">
+                            <span style="display: block; height: 3px; border-radius: 2px; background: {{ row.ms.barBg }}; width: {{ row.ms.barW }}"></span>
+                          </span>
+                        </span>
+                      </sc-if>
+                      <sc-if value="{{ row.ms.none }}">
+                        <span style="font-family: 'JetBrains Mono', monospace; font-size: 10px; color: #64646c">нет оценки</span>
+                      </sc-if>
+                      <span style="font-family: 'JetBrains Mono', monospace; font-size: 9px; color: #5f5f67">{{ row.criticCountText }}</span>
+                    </span>
+                    <span style="flex: none; width: 84px; display: flex; flex-direction: column; align-items: center; gap: 3px">
+                      <sc-if value="{{ row.us.has }}" hint-placeholder-val="{{ true }}">
+                        <span style="display: flex; flex-direction: column; align-items: center; gap: 4px">
+                          <span style="display: grid; place-items: center; font-family: 'JetBrains Mono', monospace; font-weight: 700; line-height: 1; height: 32px; min-width: 32px; padding: {{ row.us.pad }}; font-size: 14px; border-radius: {{ row.us.r }}; background: {{ row.us.bg }}; color: {{ row.us.fg }}; border: 2px {{ row.us.bs }} {{ row.us.bc }}">
+                            <span>{{ row.us.val }}<span style="font-size: 8.5px; font-weight: 500; opacity: 0.6">{{ row.us.suffix }}</span></span>
+                          </span>
+                          <span style="width: 56px; height: 3px; border-radius: 2px; background: {{ row.us.trackBg }}">
+                            <span style="display: block; height: 3px; border-radius: 2px; background: {{ row.us.barBg }}; width: {{ row.us.barW }}"></span>
+                          </span>
+                        </span>
+                      </sc-if>
+                      <sc-if value="{{ row.us.none }}">
+                        <span style="font-family: 'JetBrains Mono', monospace; font-size: 10px; color: #64646c">нет оценки</span>
+                      </sc-if>
+                      <span style="font-family: 'JetBrains Mono', monospace; font-size: 9px; color: #5f5f67">{{ row.userCountText }}</span>
+                    </span>
+                  </div>
+                </sc-for>
+              </div>
+            </div>
+
+            <div style="display: flex; flex-direction: column; gap: 12px">
+              <h2 style="margin: 0; font-size: 17px; font-weight: 600; letter-spacing: -0.01em">Что пишут в отзывах</h2>
+              <sc-if value="{{ game.hasAnySummary }}" hint-placeholder-val="{{ true }}">
+                <div style="display: grid; grid-template-columns: {{ summaryCols }}; gap: 14px">
+                  <sc-for list="{{ game.summaryCards }}" as="s" hint-placeholder-count="2">
+                    <div style="display: flex; flex-direction: column; gap: 14px; padding: 17px 18px; background: #141417; border: 1px solid #232328; border-radius: 11px; border-top: 2px solid {{ s.accent }}">
+                      <div style="display: flex; align-items: baseline; justify-content: space-between; gap: 10px; flex-wrap: wrap">
+                        <span style="font-size: 14.5px; font-weight: 600">{{ s.title }}</span>
+                        <span style="font-family: 'JetBrains Mono', monospace; font-size: 10px; color: #74747c">{{ s.countText }}</span>
+                      </div>
+                      <sc-if value="{{ s.present }}" hint-placeholder-val="{{ true }}">
+                        <div style="display: flex; flex-direction: column; gap: 14px">
+                          <div style="display: flex; flex-direction: column; gap: 7px">
+                            <span style="font-family: 'JetBrains Mono', monospace; font-size: 9.5px; letter-spacing: 0.06em; color: oklch(0.72 0.19 145)">НРАВИТСЯ</span>
+                            <sc-for list="{{ s.likes }}" as="item" hint-placeholder-count="3">
+                              <span style="display: flex; gap: 9px; font-size: 13.5px; line-height: 1.5; color: #d5d6db">
+                                <span style="flex: none; color: oklch(0.72 0.19 145); font-family: 'JetBrains Mono', monospace">+</span>{{ item }}
+                              </span>
+                            </sc-for>
+                          </div>
+                          <div style="display: flex; flex-direction: column; gap: 7px">
+                            <span style="font-family: 'JetBrains Mono', monospace; font-size: 9.5px; letter-spacing: 0.06em; color: oklch(0.68 0.18 25)">НЕ НРАВИТСЯ</span>
+                            <sc-for list="{{ s.dislikes }}" as="item" hint-placeholder-count="2">
+                              <span style="display: flex; gap: 9px; font-size: 13.5px; line-height: 1.5; color: #d5d6db">
+                                <span style="flex: none; color: oklch(0.68 0.18 25); font-family: 'JetBrains Mono', monospace">−</span>{{ item }}
+                              </span>
+                            </sc-for>
+                          </div>
+                          <p style="margin: 0; padding-top: 3px; border-top: 1px solid #232328; padding-top: 13px; font-size: 13.5px; line-height: 1.6; color: #b6b7bd; text-wrap: pretty">{{ s.summary }}</p>
+                          <span style="font-family: 'JetBrains Mono', monospace; font-size: 9.5px; color: #5f5f67; line-height: 1.5">{{ s.modelNote }}</span>
+                        </div>
+                      </sc-if>
+                      <sc-if value="{{ s.absent }}">
+                        <div style="display: flex; flex-direction: column; gap: 7px; padding: 18px 0 8px">
+                          <span style="font-size: 13.5px; color: #8b8b93">{{ s.absentText }}</span>
+                          <span style="font-family: 'JetBrains Mono', monospace; font-size: 10px; color: #5f5f67">резюме появится, когда наберутся отзывы</span>
+                        </div>
+                      </sc-if>
+                    </div>
+                  </sc-for>
+                </div>
+              </sc-if>
+              <sc-if value="{{ game.noSummaries }}">
+                <div style="display: flex; flex-direction: column; gap: 8px; align-items: flex-start; padding: 30px 20px; border: 1px dashed #2c2c33; border-radius: 11px">
+                  <span style="font-size: 15px; font-weight: 600">Отзывов пока нет</span>
+                  <span style="font-size: 13.5px; color: #8b8b93; line-height: 1.55; max-width: 52ch">Ни критики, ни игроки ещё не написали ни одного отзыва — резюмировать нечего. Обычная ситуация для игры, вышедшей несколько дней назад.</span>
+                </div>
+              </sc-if>
+            </div>
+
+            <div style="display: flex; flex-direction: column; gap: 12px">
+              <h2 style="margin: 0; font-size: 17px; font-weight: 600; letter-spacing: -0.01em">Похожие игры</h2>
+              <sc-if value="{{ game.hasSimilar }}" hint-placeholder-val="{{ true }}">
+                <div class="noscroll" style="display: grid; grid-template-columns: repeat({{ similarCols }}, minmax(0, 1fr)); gap: 12px">
+                  <sc-for list="{{ game.similar }}" as="s" hint-placeholder-count="4">
+                    <div onClick="{{ s.open }}" onKeyDown="{{ s.key }}" role="button" tabIndex="0" aria-label="{{ s.aria }}" style="cursor: pointer; display: flex; flex-direction: column; background: #141417; border: 1px solid #232328; border-radius: 10px; overflow: hidden" style-hover="border-color: #3d3d45">
+                      <div class="hatch" style="aspect-ratio: 3 / 4; background-color: #1b1b20; display: grid; place-items: center; padding: 10px; text-align: center">
+                        <sc-if value="{{ s.hasCover }}" hint-placeholder-val="{{ true }}">
+                          <span style="font-family: 'JetBrains Mono', monospace; font-size: 9px; color: #63636b">обложка</span>
+                        </sc-if>
+                        <sc-if value="{{ s.noCover }}">
+                          <span style="font-size: 12px; font-weight: 600; color: #b9bac0; line-height: 1.25">{{ s.title }}</span>
+                        </sc-if>
+                      </div>
+                      <div style="display: flex; flex-direction: column; gap: 7px; padding: 10px 11px 12px">
+                        <span style="font-size: 12.5px; font-weight: 500; line-height: 1.35; text-wrap: pretty">{{ s.title }}</span>
+                        <span style="display: flex; align-items: center; gap: 6px">
+                          <sc-if value="{{ s.ms.has }}" hint-placeholder-val="{{ true }}">
+                            <span style="display: grid; place-items: center; font-family: 'JetBrains Mono', monospace; font-weight: 700; line-height: 1; height: 26px; min-width: 26px; padding: {{ s.ms.pad }}; font-size: 12px; border-radius: {{ s.ms.r }}; background: {{ s.ms.bg }}; color: {{ s.ms.fg }}; border: 2px {{ s.ms.bs }} {{ s.ms.bc }}">
+                              <span>{{ s.ms.val }}<span style="font-size: 8px; font-weight: 500; opacity: 0.6">{{ s.ms.suffix }}</span></span>
+                            </span>
+                          </sc-if>
+                          <span style="font-family: 'JetBrains Mono', monospace; font-size: 9px; color: #5f5f67">{{ s.msNote }}</span>
+                        </span>
+                      </div>
+                    </div>
+                  </sc-for>
+                </div>
+              </sc-if>
+              <sc-if value="{{ game.noSimilar }}">
+                <div style="display: flex; flex-direction: column; gap: 8px; align-items: flex-start; padding: 26px 20px; border: 1px dashed #2c2c33; border-radius: 11px">
+                  <span style="font-size: 14.5px; font-weight: 600">Похожих игр не нашлось</span>
+                  <span style="font-size: 13.5px; color: #8b8b93; line-height: 1.55; max-width: 52ch">В базе нет игр, достаточно близких по жанру и платформам. Случайные игры вместо похожих мы не подставляем.</span>
+                </div>
+              </sc-if>
+            </div>
+          </div>
+        </div>
+      </div>
+    </sc-if>
+
+    <sc-if value="{{ onError }}">
+      <div style="display: flex; flex-direction: column; align-items: flex-start; gap: 14px; max-width: 560px; padding: 96px 0 40px">
+        <span style="font-family: 'JetBrains Mono', monospace; font-size: 54px; font-weight: 700; line-height: 1; color: #2f2f36; letter-spacing: -0.02em">{{ error.code }}</span>
+        <span style="font-size: 24px; font-weight: 700; letter-spacing: -0.02em">{{ error.title }}</span>
+        <span style="font-size: 14.5px; color: #8b8b93; line-height: 1.6; text-wrap: pretty">{{ error.note }}</span>
+        <div style="display: flex; gap: 10px; flex-wrap: wrap; padding-top: 6px">
+          <button onClick="{{ retry }}" style="cursor: pointer; border: 1px solid oklch(0.78 0.13 205); background: oklch(0.78 0.13 205); color: #0c0c0d; border-radius: 9px; padding: 11px 18px; font-size: 13.5px; font-weight: 600" style-hover="background: oklch(0.86 0.11 205)">{{ error.action }}</button>
+        </div>
+        <span style="font-family: 'JetBrains Mono', monospace; font-size: 10.5px; color: #5f5f67; margin-top: 10px; padding: 8px 11px; background: #131316; border: 1px solid #232328; border-radius: 7px">{{ error.tech }}</span>
+      </div>
+    </sc-if>
+
+  </div>
+
+  <sc-if value="{{ videoOpen }}">
+    <div onClick="{{ closeVideo }}" style="position: fixed; inset: 0; z-index: 100; display: grid; place-items: center; padding: 24px; background: rgba(8,8,9,0.86)">
+      <div onClick="{{ stop }}" role="dialog" aria-modal="true" aria-label="Трейлер игры" style="display: flex; flex-direction: column; gap: 10px; width: 100%; max-width: 900px">
+        <div style="display: flex; align-items: baseline; justify-content: space-between; gap: 12px">
+          <span style="font-size: 15px; font-weight: 600">{{ game.title }} — трейлер</span>
+          <button onClick="{{ closeVideo }}" aria-label="Закрыть трейлер" style="cursor: pointer; border: 1px solid #35353d; background: #1c1c21; color: #c6c7cd; border-radius: 7px; padding: 6px 11px; font-family: 'JetBrains Mono', monospace; font-size: 11px" style-hover="border-color: oklch(0.78 0.13 205)">закрыть · Esc</button>
+        </div>
+        <div class="hatch" style="aspect-ratio: 16 / 9; background-color: #16161a; border: 1px solid #2a2a30; border-radius: 12px; display: grid; place-items: center">
+          <span style="font-family: 'JetBrains Mono', monospace; font-size: 11px; color: #6f6f77; text-align: center; line-height: 1.7">iframe videoUrl<br>cdn.jwplayer.com · 16:9<br>грузится только при открытии окна</span>
+        </div>
+      </div>
+    </div>
+  </sc-if>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;viewport&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;options&quot;:[&quot;desktop&quot;,&quot;tablet&quot;,&quot;mobile&quot;],&quot;default&quot;:&quot;desktop&quot;,&quot;tsType&quot;:&quot;'desktop' | 'tablet' | 'mobile'&quot;,&quot;section&quot;:&quot;Макет&quot;},&quot;showSpecBar&quot;:{&quot;editor&quot;:&quot;boolean&quot;,&quot;default&quot;:true,&quot;tsType&quot;:&quot;boolean&quot;,&quot;section&quot;:&quot;Макет&quot;}}">
+const GOOD = 'oklch(0.72 0.19 145)', MIXED = 'oklch(0.82 0.16 92)', BAD = 'oklch(0.64 0.21 25)';
+const MONTHS = ['января','февраля','марта','апреля','мая','июня','июля','августа','сентября','октября','ноября','декабря'];
+
+const S = {
+  onimusha: {
+    critic: {
+      likes: ['Возвращение легендарной серии в прежней форме', 'Блестящая боевая система на парировании', 'Плотный арт-дирекшен эпохи Сэнгоку'],
+      dislikes: ['Излишний открытый мир между главами', 'Повторяющиеся боссы во второй половине'],
+      summary: 'Критики сходятся на том, что Capcom вернула серии её главное — вес удара и цену ошибки. Претензии почти все об одном: открытый мир разбавляет то, что работает лучше всего в тесных коридорах.',
+      reviewCount: 89, model: 'z-ai/glm-4.7-flash'
+    },
+    user: {
+      likes: ['Ощущение удара и парирования', 'Нет микротранзакций', 'Хорошая оптимизация на PC'],
+      dislikes: ['Короткая кампания за полную цену', 'Скучные побочные задания'],
+      summary: 'Игроки оценивают выше критиков и спорят в основном о длительности: 12 часов кампании при полном ценнике устраивают не всех, но к самой боевой системе претензий почти нет.',
+      reviewCount: 28, model: 'z-ai/glm-4.7-flash'
+    }
+  },
+  resonance: {
+    critic: {
+      likes: ['Сильная драматургия финала', 'Работа со светом и толпой', 'Музыка Оливье Деривьера'],
+      dislikes: ['Стелс остаётся простым', 'Технические просадки на консолях'],
+      summary: 'Рецензенты хвалят повествование и постановку, считая механики лишь аккуратным сопровождением истории. Единственная общая претензия — стелс, который не развился со времён предыдущей части.',
+      reviewCount: 61, model: 'z-ai/glm-4.7-flash'
+    },
+    user: null
+  },
+  hollow: {
+    critic: null,
+    user: {
+      likes: ['Атмосфера заброшенной станции', 'Звук — лучшее, что здесь есть'],
+      dislikes: ['Много багов на релизе', 'Непонятная система сохранений', 'Финал обрывается'],
+      summary: 'Игроки отмечают атмосферу и звук, но большая часть отзывов — про баги первой недели и обрывающийся финал. Мнения о том, стоит ли ждать патчей, разделились.',
+      reviewCount: 34, model: 'z-ai/glm-4.7-flash'
+    }
+  },
+  gp: {
+    critic: {
+      likes: ['Обновлённая физика шин', 'Полный официальный ростер сезона'],
+      dislikes: ['Карьерный режим почти не изменился', 'Тот же движок и те же меню'],
+      summary: 'Ежегодное обновление: физика стала точнее, всё остальное осталось прежним. Критики советуют брать только тем, кто пропустил прошлую часть.',
+      reviewCount: 44, model: 'z-ai/glm-4.7-flash'
+    },
+    user: {
+      likes: ['Физика шин действительно лучше'],
+      dislikes: ['Цена как за новую игру', 'Те же баги, что год назад', 'Онлайн не работает в день релиза'],
+      summary: 'Оценки игроков резко ниже критических: главная претензия — полная цена за обновление ростера при сохранившихся прошлогодних проблемах.',
+      reviewCount: 512, model: 'z-ai/glm-4.7-flash'
+    }
+  },
+  arden: {
+    critic: {
+      likes: ['Ручная работа над каждым регионом', 'Экономная, но точная подача сюжета', 'Честная сложность'],
+      dislikes: ['Инвентарь неудобен на геймпаде'],
+      summary: 'Один из самых уверенных релизов месяца по мнению критиков: продуманный мир и внимательная подача при почти полном отсутствии подсказок.',
+      reviewCount: 52, model: 'z-ai/glm-4.7-flash'
+    },
+    user: {
+      likes: ['Мир, который хочется изучать', 'Никаких лишних маркеров на карте'],
+      dislikes: ['Высокий порог входа', 'Мелкий шрифт в интерфейсе'],
+      summary: 'Игроки ценят отказ от подсказок и плотность мира; основные жалобы касаются интерфейса и первых часов, где игра ничего не объясняет.',
+      reviewCount: 197, model: 'z-ai/glm-4.7-flash'
+    }
+  },
+  neon: {
+    critic: {
+      likes: ['Лучший в жанре дизайн уровней', 'Стрельба с идеальной отдачей', 'Кооператив без разрывов сессии'],
+      dislikes: ['Слабый сюжет между заданиями'],
+      summary: 'Критики называют игру эталоном кооперативного шутера года: сюжет служебный, но всё, что касается стрельбы и уровней, сделано образцово.',
+      reviewCount: 74, model: 'z-ai/glm-4.7-flash'
+    },
+    user: {
+      likes: ['Идеально играется с друзьями', 'Регулярные бесплатные карты'],
+      dislikes: ['Мало контента в одиночку'],
+      summary: 'Игроки почти единодушны: в кооперативе игра держит внимание надолго, в одиночку заканчивается быстро.',
+      reviewCount: 1240, model: 'z-ai/glm-4.7-flash'
+    }
+  }
+};
+
+const LONG = {
+  critic: {
+    likes: [
+      'Переработанная картография: каждая карта теперь читается как отдельная головоломка со своей внутренней логикой',
+      'Полностью перезаписанная озвучка на двенадцати языках, включая редкие региональные варианты произношения',
+      'Ремастер сохранил оригинальный художественный замысел и не подменил его современными визуальными привычками',
+      'Сюжетные развилки второй главы наконец получили те последствия, которых им не хватало в издании 2019 года',
+      'Отдельный режим для тех, кто проходил оригинал: игра помнит старые сохранения и комментирует прежние решения'
+    ],
+    dislikes: [
+      'Интерфейс инвентаря по-прежнему рассчитан на мышь и на геймпаде требует четырёх нажатий там, где хватило бы одного',
+      'Загрузки между регионами длиннее, чем в оригинале, несмотря на обещанную оптимизацию под новое поколение консолей',
+      'Дополнительное содержимое юбилейного издания сводится к набору предметов, а не к обещанной новой сюжетной линии',
+      'Русская локализация местами теряет игру слов, на которой держались диалоги торговцев в портовых городах',
+      'Цена юбилейного издания сопоставима с полноценным новым релизом, что критики называют главным просчётом'
+    ],
+    summary: 'Критики сходятся на том, что это аккуратный, местами образцовый ремастер, который бережно относится к оригиналу и не пытается его переписать. Претензии касаются не самой игры, а издания: устаревший интерфейс, скудное юбилейное дополнение и цена, которая ставит ремастер в один ряд с новыми играми.',
+    reviewCount: 118, model: 'z-ai/glm-4.7-flash'
+  },
+  user: {
+    likes: [
+      'Сохранения из оригинала действительно подхватываются, и игра отдельно отмечает решения, принятые семь лет назад',
+      'Наконец-то читаемый шрифт на телевизоре: в оригинале приходилось подсаживаться к экрану вплотную',
+      'Никаких внутриигровых покупок, боевого пропуска и сезонов — полная игра сразу после установки'
+    ],
+    dislikes: [
+      'На средних конфигурациях просадки в порту Аквилеи остались там же, где были в оригинальном издании',
+      'Управление в меню крафта настолько неудобное, что часть игроков рекомендует проходить игру только с мышью'
+    ],
+    summary: 'Игроки оценивают ремастер выше критиков и почти единодушны в главном: это та же игра, к которой относились с уважением. Основные жалобы — производительность в одной конкретной локации и меню крафта.',
+    reviewCount: 3417, model: 'z-ai/glm-4.7-flash'
+  }
+};
+
+const D = [
+  { slug: 'onimusha-way-of-the-sword', title: 'Onimusha: Way of the Sword', dev: 'Capcom', pub: 'Capcom', date: '2026-09-04', genres: ['Action Adventure'], platforms: ['PC', 'PlayStation 5', 'Xbox Series X'], ms: 89, us: 9.3, cover: true, video: true, esrb: 'M', sum: S.onimusha, similar: ['resonance-a-plague-tale-legacy', 'last-light-of-arden', 'vector-siege', 'apex-of-thieves'], desc: 'Fight through bloodstained battlefields of the late Sengoku period as a swordsman bound to a demon gauntlet. Parry, counter and absorb the souls of those you cut down.' },
+  { slug: 'neon-vaults', title: 'Neon Vaults', dev: 'Fathom Loop', pub: 'Annapurna Interactive', date: '2026-09-03', genres: ['Shooter', 'Action'], platforms: ['PC', 'PlayStation 5', 'Xbox Series X', 'Nintendo Switch 2'], ms: 91, us: 8.9, cover: true, video: true, esrb: 'T', sum: S.neon, similar: ['vector-siege', 'apex-of-thieves', 'mecha-drift-2'], desc: 'A four-player heist shooter set in a city of stacked vaults. Every run rewires the layout, the guards and the way out.' },
+  { slug: 'last-light-of-arden', title: 'Last Light of Arden', dev: 'Coldwater Studio', pub: 'Devolver Digital', date: '2026-09-02', genres: ['RPG'], platforms: ['PC', 'PlayStation 5'], ms: 88, us: 8.5, cover: true, video: false, esrb: 'M', sum: S.arden, similar: ['onimusha-way-of-the-sword', 'skyward-tactics', 'silent-orchard'], desc: 'A hand-drawn kingdom on the edge of a long winter. No quest markers, no map icons — only what people tell you and what you find.' },
+  { slug: 'resonance-a-plague-tale-legacy', title: 'Resonance: A Plague Tale Legacy', dev: 'Asobo Studio', pub: 'Focus Entertainment', date: '2026-09-01', genres: ['Action Adventure'], platforms: ['PC', 'PlayStation 5', 'Xbox Series X'], ms: 84, us: 8.1, cover: true, video: false, esrb: null, sum: S.resonance, similar: ['onimusha-way-of-the-sword', 'last-light-of-arden', 'silent-orchard'], desc: 'Two siblings cross a country hollowed out by plague, guided by a sound only one of them can hear.' },
+  { slug: 'apex-of-thieves', title: 'Apex of Thieves', dev: 'Ninebrook', pub: 'Ninebrook', date: '2026-08-31', genres: ['Action', 'Roguelike'], platforms: ['PC', 'Xbox Series X'], ms: 83, us: 7.6, cover: true, video: false, esrb: null, sum: { critic: S.arden.critic, user: null }, similar: ['neon-vaults', 'vector-siege'], desc: null },
+  { slug: 'tidebound', title: 'Tidebound', dev: 'Salt & Signal', pub: 'Salt & Signal', date: '2026-09-05', genres: ['Simulation', 'Adventure'], platforms: ['PC', 'Nintendo Switch 2'], ms: 82, us: null, cover: true, video: false, esrb: null, sum: { critic: null, user: null }, similar: ['farmstead-echo', 'silent-orchard'], desc: 'Run a lighthouse on a coast that changes shape with every tide. Log what washes up, decide what to keep.' },
+  { slug: 'vector-siege', title: 'Vector Siege', dev: 'Hard Reset Games', pub: 'Paradox Interactive', date: '2026-08-29', genres: ['Strategy'], platforms: ['PC'], ms: 79, us: null, cover: true, video: false, esrb: null, sum: { critic: S.gp.critic, user: null }, similar: ['skyward-tactics', 'neon-vaults'], desc: 'Real-time siege warfare on a single continuous map. Supply lines matter more than armies.' },
+  { slug: 'hollow-signal', title: 'Hollow Signal', dev: 'Ninth Circuit', pub: 'Ninth Circuit', date: '2026-09-06', genres: ['Adventure', 'Horror'], platforms: ['PC', 'PlayStation 5'], ms: 76, us: 6.2, cover: false, video: false, esrb: null, sum: S.hollow, similar: ['silent-orchard'], desc: null },
+  { slug: 'skyward-tactics', title: 'Skyward Tactics', dev: 'Loft Eleven', pub: 'Kepler Interactive', date: '2026-08-28', genres: ['Strategy', 'RPG'], platforms: ['PC', 'Nintendo Switch 2', 'PlayStation 5'], ms: 74, us: 6.8, cover: true, video: false, esrb: 'E10+', sum: { critic: null, user: null }, similar: ['vector-siege', 'last-light-of-arden'], desc: 'Turn-based battles fought on floating islands you can tilt, drop and stack.' },
+  { slug: 'grand-prix-2027', title: 'Grand Prix 2027', dev: 'Codemasters', pub: 'EA Sports', date: '2026-08-27', genres: ['Racing', 'Sports'], platforms: ['PC', 'PlayStation 5', 'Xbox Series X', 'PlayStation 4'], ms: 71, us: 4.2, cover: true, video: false, esrb: 'E', sum: S.gp, similar: [], desc: 'The official game of the 2027 season, with every team, circuit and driver of the championship.' },
+  { slug: 'kingdom-of-ash-remastered', title: 'Kingdom of Ash Remastered', dev: 'Grey Fox Works', pub: 'THQ Nordic', date: '2026-08-26', genres: ['RPG'], platforms: ['PC', 'PlayStation 5', 'Xbox Series X'], ms: 68, us: null, cover: true, video: false, esrb: null, status: 'failed', sum: { critic: null, user: null }, similar: ['last-light-of-arden'], desc: null },
+  { slug: 'pixel-dungeon-royale', title: 'Pixel Dungeon Royale', dev: 'Twelve Bit', pub: 'Twelve Bit', date: '2026-08-25', genres: ['Roguelike'], platforms: ['PC', 'Nintendo Switch 2'], ms: 62, us: 7.1, cover: true, video: false, esrb: null, sum: { critic: null, user: S.neon.user }, similar: ['apex-of-thieves'], desc: 'Sixty players drop into one dungeon. Only the loot is shared.' },
+  { slug: 'rust-and-rain', title: 'Rust and Rain', dev: 'Halfstep', pub: 'Halfstep', date: '2026-08-24', genres: ['Adventure'], platforms: ['PC'], ms: 58, us: 5.1, cover: false, video: false, esrb: null, sum: { critic: null, user: null }, similar: [], desc: null },
+  { slug: 'silent-orchard', title: 'Silent Orchard', dev: 'Pale Meadow', pub: 'Pale Meadow', date: '2026-08-23', genres: ['Puzzle', 'Adventure'], platforms: ['PC', 'PlayStation 5', 'Nintendo Switch 2'], ms: 55, us: 6.4, cover: true, video: false, esrb: 'E', sum: { critic: S.resonance.critic, user: null }, similar: ['tidebound', 'farmstead-echo'], desc: 'A walled orchard where every tree hides a mechanism and nobody explains anything.' },
+  { slug: 'farmstead-echo', title: 'Farmstead Echo', dev: null, pub: null, date: null, genres: [], platforms: ['Nintendo Switch 2', 'PC'], ms: null, us: 7.9, cover: true, video: false, esrb: null, sum: { critic: null, user: S.arden.user }, similar: ['tidebound'], desc: 'Rebuild a farm from the recordings your grandmother left behind.' },
+  { slug: 'mecha-drift-2', title: 'Mecha Drift 2', dev: 'Bolt Arcade', pub: 'Bolt Arcade', date: '2026-08-21', genres: ['Racing', 'Action'], platforms: ['PC', 'PlayStation 4', 'Xbox Series X'], ms: 47, us: 3.8, cover: true, coverBroken: true, video: true, esrb: 'T', sum: { critic: S.gp.critic, user: S.gp.user }, similar: ['grand-prix-2027'], desc: null },
+  { slug: 'the-cartographers-daughter-remastered-anniversary-edition', title: "The Cartographer's Daughter — Remastered Anniversary Edition", dev: 'Sunken Compass Interactive Entertainment Studios', pub: 'Northern Harbour Publishing Group Limited', date: '2026-08-20', genres: ['Action Adventure', 'RPG', 'Simulation', 'Puzzle'], platforms: ['PC', 'PlayStation 5', 'PlayStation 4', 'Xbox Series X', 'Xbox One', 'Nintendo Switch 2'], ms: 72, us: 7.4, cover: true, video: true, esrb: 'M', sum: LONG, similar: ['last-light-of-arden', 'silent-orchard', 'tidebound', 'onimusha-way-of-the-sword', 'skyward-tactics'], desc: 'Seven years after the original, the anniversary edition returns to the drowned archipelago with rewritten voice work, restored cut chapters and every map redrawn by hand. Your grandmother left behind an atlas of a country that no longer exists, and every coastline in it has moved since she died.' }
+];
+
+const PAGE = 8;
+
+class Component extends DCLogic {
+  state = {
+    route: 'list', slug: null, q: '', platform: null, sort: 'date',
+    shown: PAGE, loading: false, initialLoading: false, emptyDb: false,
+    vp: this.props.viewport || 'desktop',
+    scenario: 'list-full', videoOpen: false, errorCode: null, listScroll: 0, stale: false
+  };
+
+  key(fn) { return e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); fn(); } }; }
+
+  showVideo() {
+    this.trigger = document.activeElement;
+    this.setState({ videoOpen: true });
+    const grab = tries => requestAnimationFrame(() => {
+      const b = document.querySelector('[role="dialog"] button');
+      if (b) b.focus();
+      else if (tries > 0) grab(tries - 1);
+    });
+    grab(10);
+  }
+
+  hideVideo() {
+    const t = this.trigger;
+    this.setState({ videoOpen: false });
+    requestAnimationFrame(() => { if (t && t.focus) t.focus(); });
+  }
+
+  componentDidMount() {
+    this.onKey = e => { if (e.key === 'Escape' && this.state.videoOpen) this.hideVideo(); };
+    window.addEventListener('keydown', this.onKey);
+    this.onScroll = () => {
+      if (this.state.route !== 'list' || this.state.loading) return;
+      const rest = document.documentElement.scrollHeight - window.scrollY - window.innerHeight;
+      if (rest > 400) return;
+      const list = this.filtered();
+      if (this.state.shown >= list.length) return;
+      this.setState({ loading: true });
+      clearTimeout(this.t);
+      this.t = setTimeout(() => this.setState(s => ({ shown: s.shown + PAGE, loading: false })), 550);
+    };
+    window.addEventListener('scroll', this.onScroll, { passive: true });
+  }
+  componentWillUnmount() { window.removeEventListener('scroll', this.onScroll); window.removeEventListener('keydown', this.onKey); clearTimeout(this.t); }
+
+  more() {
+    if (this.state.loading) return;
+    this.setState({ loading: true });
+    clearTimeout(this.t);
+    this.t = setTimeout(() => this.setState(s => ({ shown: s.shown + PAGE, loading: false })), 550);
+  }
+
+  openGame(slug) {
+    this.setState({ route: 'game', slug, errorCode: null, videoOpen: false, listScroll: window.scrollY, scenario: 'game-full' });
+    this.top();
+  }
+
+  backToList() {
+    const y = this.state.listScroll;
+    this.setState({ route: 'list', errorCode: null, videoOpen: false, scenario: 'list-full' });
+    requestAnimationFrame(() => window.scrollTo(0, y));
+  }
+
+  top() { window.scrollTo(0, 0); }
+
+  filtered() {
+    const s = this.state;
+    let list = D.filter(g => !s.platform || g.platforms.indexOf(s.platform) >= 0);
+    if (s.q.trim()) { const q = s.q.trim().toLowerCase(); list = list.filter(g => g.title.toLowerCase().indexOf(q) >= 0); }
+    const by = {
+      date: (a, b) => (b.date || '').localeCompare(a.date || ''),
+      title: (a, b) => a.title.localeCompare(b.title),
+      metascore: (a, b) => (b.ms === null ? -1 : b.ms) - (a.ms === null ? -1 : a.ms),
+      userscore: (a, b) => (b.us === null ? -1 : b.us) - (a.us === null ? -1 : a.us)
+    };
+    return list.slice().sort(by[s.sort]);
+  }
+
+  tier(v, max) { const n = v / max; return n >= 0.75 ? GOOD : n >= 0.5 ? MIXED : BAD; }
+
+  badge(kind, value) {
+    const critic = kind === 'critic';
+    if (value === null || value === undefined) {
+      return { has: false, none: true, val: '—', suffix: '', label: 'нет оценки', labelShort: 'нет оценки', bg: 'transparent', fg: '#64646c', bc: '#33333a', bs: 'dashed',
+        r: '7px', rBig: '9px', pad: '0 8px', fs: '16px', fsBig: '20px',
+        trackBg: '#1e1e23', barBg: 'transparent', barW: '0%' };
+    }
+    const max = critic ? 100 : 10;
+    const color = this.tier(value, max);
+    const val = critic ? String(value) : value.toFixed(1);
+    const pct = Math.round((value / max) * 100) + '%';
+    return { has: true, none: false, val, suffix: critic ? '/100' : '/10', label: critic ? 'КРИТИКИ 0–100' : 'ИГРОКИ 0–10', labelShort: critic ? 'КРИТИКИ' : 'ИГРОКИ',
+      bg: 'rgba(255,255,255,0.045)', fg: color, bc: 'transparent', bs: 'solid', r: '7px', rBig: '9px', pad: '0 9px', fs: '17px', fsBig: '22px',
+      trackBg: '#26262b', barBg: color, barW: pct };
+  }
+
+  platformRows(g) {
+    return g.platforms.map((p, i) => {
+      const ms = i === 0 ? g.ms : (i % 2 ? null : (g.ms === null ? null : Math.max(0, g.ms - 3 * i)));
+      const us = i === 1 ? (g.us === null ? null : g.us) : (i % 3 === 2 ? null : (g.us === null ? null : Math.max(0, +(g.us - 0.3 * i).toFixed(1))));
+      const cc = ms === null ? (i % 2 ? 3 : 2) : 90 - 12 * i;
+      const uc = us === null ? null : 177 - 30 * i;
+      return {
+        platform: p, ms: this.badge('critic', ms), us: this.badge('user', us),
+        criticCountText: ms === null ? cc + ' рецензии' : cc + ' рецензий',
+        userCountText: uc === null ? '' : uc + ' оценок'
+      };
+    });
+  }
+
+  detail(slug) {
+    const g = D.find(x => x.slug === slug) || D[0];
+    const failed = g.status === 'failed';
+    const facts = [
+      { k: 'РАЗРАБОТЧИК', v: g.dev || 'не указан' },
+      { k: 'ИЗДАТЕЛЬ', v: g.pub || 'не указан' },
+      { k: 'ДАТА ВЫХОДА', v: this.dateText(g.date) }
+    ];
+    if (g.esrb) facts.push({ k: 'РЕЙТИНГ ESRB', v: g.esrb });
+    const sum = g.sum || { critic: null, user: null };
+    const cards = [];
+    if (sum.critic || sum.user) {
+      cards.push(this.sumCard('critic', sum.critic));
+      cards.push(this.sumCard('user', sum.user));
+    }
+    return {
+      slug: g.slug, title: g.title, failed,
+      hasCover: !!g.cover && !g.coverBroken, noCover: !g.cover || !!g.coverBroken,
+      coverNote: g.coverBroken ? 'ССЫЛКА НА ОБЛОЖКУ НЕ ОТКРЫЛАСЬ' : 'ОБЛОЖКИ НЕТ',
+      hasVideo: !!g.video, genres: g.genres, hasGenres: g.genres.length > 0, noGenres: g.genres.length === 0,
+      hasDesc: !!g.desc, noDesc: !g.desc, desc: g.desc || '',
+      facts,
+      ms: this.badge('critic', g.ms), us: this.badge('user', g.us),
+      criticNote: g.ms === null ? 'ни одна платформа не оценена' : 'лучшее из ' + g.platforms.length + ' платформ',
+      userNote: g.us === null ? 'игроки ещё не оценивали' : 'лучшее из ' + g.platforms.length + ' платформ',
+      platformRows: this.platformRows(g),
+      hasAnySummary: !!(sum.critic || sum.user), noSummaries: !(sum.critic || sum.user),
+      summaryCards: cards,
+      hasSimilar: g.similar.length > 0, noSimilar: g.similar.length === 0,
+      similar: g.similar.map(s => {
+        const it = D.find(x => x.slug === s);
+        return { slug: s, title: it.title, hasCover: !!it.cover && !it.coverBroken, noCover: !it.cover || !!it.coverBroken, ms: this.badge('critic', it.ms),
+          msNote: it.ms === null ? 'нет метаскора' : 'метаскор',
+          open: () => { this.setState({ slug: s, videoOpen: false }); this.top(); },
+          key: this.key(() => { this.setState({ slug: s, videoOpen: false }); this.top(); }),
+          aria: 'Открыть карточку игры ' + it.title };
+      })
+    };
+  }
+
+  sumCard(kind, s) {
+    const critic = kind === 'critic';
+    if (!s) return { title: critic ? 'Критики' : 'Игроки', present: false, absent: true, countText: 'нет отзывов',
+      absentText: critic ? 'Рецензий критиков по этой игре ещё нет.' : 'Игроки пока не оставили отзывов.',
+      accent: '#2c2c33', likes: [], dislikes: [], summary: '', modelNote: '' };
+    return {
+      title: critic ? 'Критики' : 'Игроки', present: true, absent: false,
+      countText: 'по ' + s.reviewCount + ' отзывам',
+      accent: critic ? 'oklch(0.78 0.13 205)' : 'oklch(0.72 0.19 145)',
+      likes: s.likes, dislikes: s.dislikes, summary: s.summary,
+      modelNote: 'резюме составлено нейросетью · ' + s.model + ' · 07.09.2026',
+      absentText: ''
+    };
+  }
+
+  dateText(d) {
+    if (!d) return 'дата неизвестна';
+    const p = d.split('-');
+    return Number(p[2]) + ' ' + MONTHS[Number(p[1]) - 1] + ' ' + p[0];
+  }
+
+  scenarioList() {
+    return [
+      { id: 'list-full', name: 'Список — полный' },
+      { id: 'list-loading', name: 'Список — загрузка' },
+      { id: 'list-empty-search', name: 'Список — поиск без результатов' },
+      { id: 'list-empty-db', name: 'Список — база пуста' },
+      { id: 'game-full', name: 'Карточка — всё есть' },
+      { id: 'game-bare', name: 'Карточка — без обложки, описания, трейлера' },
+      { id: 'game-no-reviews', name: 'Карточка — отзывов нет' },
+      { id: 'game-one-summary', name: 'Карточка — резюме только критиков' },
+      { id: 'game-no-similar', name: 'Карточка — похожих нет' },
+      { id: 'game-failed', name: 'Карточка — статус failed' },
+      { id: 'game-no-fields', name: 'Карточка — нет даты, разработчика, жанров' },
+      { id: 'game-broken-cover', name: 'Карточка — битая ссылка на обложку' },
+      { id: 'game-long', name: 'Карточка — очень длинные данные' },
+      { id: 'list-stale', name: 'Список — обход давно не удавался' },
+      { id: 'error-404', name: 'Ошибка 404 — игры нет' },
+      { id: 'error-500', name: 'Ошибка 500 — сервер не ответил' }
+    ];
+  }
+
+  applyScenario(id) {
+    const base = { scenario: id, q: '', platform: null, emptyDb: false, initialLoading: false, shown: PAGE, loading: false, videoOpen: false, errorCode: null, stale: false };
+    const map = {
+      'list-full': { route: 'list' },
+      'list-loading': { route: 'list', initialLoading: true },
+      'list-empty-search': { route: 'list', q: 'bloodborne' },
+      'list-empty-db': { route: 'list', emptyDb: true },
+      'game-full': { route: 'game', slug: 'onimusha-way-of-the-sword' },
+      'game-bare': { route: 'game', slug: 'hollow-signal' },
+      'game-no-reviews': { route: 'game', slug: 'tidebound' },
+      'game-one-summary': { route: 'game', slug: 'silent-orchard' },
+      'game-no-similar': { route: 'game', slug: 'rust-and-rain' },
+      'game-failed': { route: 'game', slug: 'kingdom-of-ash-remastered' },
+      'game-no-fields': { route: 'game', slug: 'farmstead-echo' },
+      'game-broken-cover': { route: 'game', slug: 'mecha-drift-2' },
+      'game-long': { route: 'game', slug: 'the-cartographers-daughter-remastered-anniversary-edition' },
+      'list-stale': { route: 'list', stale: true },
+      'error-404': { route: 'error', errorCode: 404, slug: 'gothic-1-remake' },
+      'error-500': { route: 'error', errorCode: 500 }
+    };
+    this.setState(Object.assign(base, map[id]));
+    this.top();
+  }
+
+  url() {
+    const s = this.state;
+    if (s.route === 'error') return s.errorCode === 404 ? '/game/' + s.slug + '  →  404 not_found' : '/api/games  →  500 internal_error';
+    if (s.route === 'game') return '/game/' + s.slug;
+    const p = [];
+    if (s.platform) p.push('platform=' + encodeURIComponent(s.platform));
+    if (s.q.trim()) p.push('q=' + encodeURIComponent(s.q.trim()));
+    if (s.sort !== 'date') p.push('sort=' + s.sort);
+    return '/' + (p.length ? '?' + p.join('&') : '');
+  }
+
+  renderVals() {
+    const s = this.state;
+    const vpMap = { desktop: '1280px', tablet: '834px', mobile: '390px' };
+    const colsMap = { desktop: 5, tablet: 3, mobile: 2 };
+    const list = this.filtered();
+    const cards = s.initialLoading || s.emptyDb ? [] : list.slice(0, s.shown).map(g => ({
+      title: g.title, dev: g.dev || 'разработчик не указан', dateText: this.dateText(g.date),
+      genres: g.genres, hasGenres: g.genres.length > 0, noGenres: g.genres.length === 0,
+      platformsText: g.platforms.join(' · '),
+      hasCover: !!g.cover && !g.coverBroken, noCover: !g.cover || !!g.coverBroken,
+      coverNote: g.coverBroken ? 'ССЫЛКА НЕ ОТКРЫЛАСЬ' : 'ОБЛОЖКИ НЕТ',
+      failed: g.status === 'failed',
+      ms: this.badge('critic', g.ms), us: this.badge('user', g.us),
+      open: () => this.openGame(g.slug),
+      key: this.key(() => this.openGame(g.slug)),
+      aria: 'Открыть карточку игры ' + g.title
+    }));
+
+    const counts = {};
+    D.forEach(g => g.platforms.forEach(p => { counts[p] = (counts[p] || 0) + 1; }));
+    const chipStyle = active => active
+      ? { bg: 'oklch(0.78 0.13 205)', fg: '#0c0c0d', bc: 'oklch(0.78 0.13 205)' }
+      : { bg: '#151518', fg: '#c6c7cd', bc: '#2a2a30' };
+    const platformChips = [Object.assign({ platform: 'Все платформы', gameCount: D.length, active: !s.platform, pick: () => this.setState({ platform: null, shown: PAGE }) }, chipStyle(!s.platform))]
+      .concat(Object.keys(counts).sort((a, b) => counts[b] - counts[a]).map(p =>
+        Object.assign({ platform: p, gameCount: counts[p], active: s.platform === p, pick: () => this.setState({ platform: p, shown: PAGE }) }, chipStyle(s.platform === p))));
+
+    const sortLabels = { date: 'по дате', metascore: 'по метаскору', userscore: 'по игрокам', title: 'по названию' };
+    const sorts = ['date', 'metascore', 'userscore', 'title'].map(id => ({
+      label: sortLabels[id], active: s.sort === id, pick: () => this.setState({ sort: id, shown: PAGE }),
+      bg: s.sort === id ? '#2a2a31' : 'transparent', fg: s.sort === id ? '#f2f3f5' : '#8b8b93'
+    }));
+
+    const btn = active => active
+      ? { bg: 'oklch(0.78 0.13 205)', fg: '#0c0c0d', bc: 'oklch(0.78 0.13 205)' }
+      : { bg: '#202025', fg: '#a9aab1', bc: '#33333a' };
+    const vpOptions = [['desktop', '1280'], ['tablet', '834'], ['mobile', '390']].map(v =>
+      Object.assign({ label: v[1], pick: () => this.setState({ vp: v[0] }) }, btn(s.vp === v[0])));
+
+    const skelCount = s.initialLoading ? colsMap[s.vp] * 2 : (s.loading ? colsMap[s.vp] : 0);
+    const onList = s.route === 'list';
+    const hasResults = onList && !s.emptyDb && (cards.length > 0 || s.initialLoading);
+
+    return {
+      showBar: this.props.showSpecBar !== false,
+      url: this.url(),
+      scenario: s.scenario, scenarios: this.scenarioList(),
+      setScenario: e => this.applyScenario(e.target.value),
+      vpWidth: vpMap[s.vp], cols: colsMap[s.vp],
+      detailCols: s.vp === 'mobile' ? '1fr' : '300px minmax(0, 1fr)',
+      summaryCols: s.vp === 'desktop' ? 'repeat(2, minmax(0, 1fr))' : '1fr',
+      similarCols: s.vp === 'mobile' ? 2 : 4,
+      titleSize: s.vp === 'mobile' ? '27px' : '38px',
+      vpOptions,
+      onList, onGame: s.route === 'game', onError: s.route === 'error',
+      error: s.errorCode === 404
+        ? { code: '404', title: 'Такой игры в каталоге нет', note: 'Адрес мог устареть, или игру ещё не собрал обход Metacritic. Проверить стоит по списку — он обновляется раз в час.', action: 'Ко всем играм', tech: 'GET /api/games/' + s.slug + ' → 404 {"error":"not_found"}', primary: true }
+        : { code: '500', title: 'Сервис не ответил', note: 'Сбой на нашей стороне, с каталогом всё в порядке. Обычно проходит за минуту — попробуйте обновить страницу.', action: 'Обновить', tech: 'GET /api/games → 500 {"error":"internal_error"}', primary: false },
+      retry: () => this.applyScenario('list-full'),
+      videoOpen: s.videoOpen && s.route === 'game',
+      openVideo: () => this.showVideo(),
+      openVideoKey: this.key(() => this.showVideo()),
+      closeVideo: () => this.hideVideo(),
+      stop: e => e.stopPropagation(),
+      stale: s.route === 'list' && s.stale,
+      staleText: 'Последний удачный обход — 6 сентября в 04:00, 33 часа назад. Свежие релизы Metacritic могут в каталоге ещё не появиться.',
+      showMore: onList && !s.initialLoading && !s.loading && cards.length > 0 && cards.length < list.length,
+      moreText: 'Показать ещё ' + Math.min(PAGE, list.length - cards.length),
+      loadMore: () => this.more(),
+      q: s.q, setQ: e => this.setState({ q: e.target.value, shown: PAGE }),
+      sorts, platformChips,
+      cards, skeletons: new Array(skelCount).fill(0),
+      hasResults,
+      countText: list.length + ' ' + (list.length % 10 === 1 && list.length !== 11 ? 'игра' : 'игр') + ' по отбору · показано ' + Math.min(s.shown, list.length),
+      sortNote: 'сортировка: ' + sortLabels[s.sort],
+      allShown: onList && !s.initialLoading && cards.length > 0 && cards.length >= list.length,
+      noResults: onList && !s.emptyDb && !s.initialLoading && cards.length === 0,
+      noResultsTitle: s.q.trim() ? 'По запросу «' + s.q.trim() + '» ничего не нашлось' : 'Под этот отбор игр нет',
+      noResultsNote: s.q.trim() ? 'Поиск идёт только по названию игры и не учитывает описания. Проверьте раскладку или снимите фильтр по платформе.' : 'Попробуйте выбрать другую платформу.',
+      reset: () => this.setState({ q: '', platform: null, shown: PAGE }),
+      emptyDb: onList && s.emptyDb,
+      goList: () => this.backToList(),
+      game: this.detail(s.slug)
+    };
+  }
+}
+</script>
+</body>
+</html>

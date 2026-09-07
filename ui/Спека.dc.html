@@ -1,0 +1,296 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Sora:wght@400;600;700;800&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+<style>
+  html, body { margin: 0; padding: 0; background: #0c0c0d; }
+  body { font-family: 'Sora', system-ui, sans-serif; -webkit-font-smoothing: antialiased; }
+  a { color: oklch(0.78 0.13 205); text-decoration: none; }
+  a:hover { color: oklch(0.88 0.10 205); }
+  ::selection { background: oklch(0.78 0.13 205); color: #0c0c0d; }
+</style>
+</helmet>
+
+<div style="min-height: 100vh; background: #0c0c0d; color: #edeef0; padding: 0 16px 90px">
+  <div style="max-width: 900px; margin: 0 auto">
+
+    <header style="display: flex; flex-direction: column; gap: 14px; padding: 44px 0 26px; border-bottom: 1px solid #1e1e22">
+      <span style="font-family: 'JetBrains Mono', monospace; font-size: 11px; letter-spacing: 0.08em; color: #74747c">MCWATCH · СПЕКА ДЛЯ РАЗРАБОТКИ</span>
+      <h1 style="margin: 0; font-size: 34px; font-weight: 800; letter-spacing: -0.03em; line-height: 1.1">Как собирать интерфейс</h1>
+      <p style="margin: 0; max-width: 62ch; font-size: 15px; line-height: 1.6; color: #a9aab1; text-wrap: pretty">Решения, принятые в макете, и правила, которые из них следуют. Живой макет — <a href="mcwatch.dc.html">mcwatch</a>: там же переключатель состояний и трёх ширин. Данные берутся только из трёх маршрутов брифа.</p>
+    </header>
+
+    <section style="display: flex; flex-direction: column; gap: 16px; padding: 40px 0 0">
+      <h2 style="margin: 0; font-size: 20px; font-weight: 700; letter-spacing: -0.02em">Цвет</h2>
+      <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 10px">
+        <sc-for list="{{ colors }}" as="c" hint-placeholder-count="8">
+          <div style="display: flex; flex-direction: column; gap: 8px; padding: 12px; background: #141417; border: 1px solid #232328; border-radius: 9px">
+            <span style="height: 34px; border-radius: 6px; border: 1px solid #2a2a30; background: {{ c.value }}"></span>
+            <span style="font-size: 12.5px; font-weight: 600">{{ c.name }}</span>
+            <span style="font-family: 'JetBrains Mono', monospace; font-size: 9.5px; color: #74747c; line-height: 1.5; word-break: break-all">{{ c.value }}</span>
+            <span style="font-size: 11.5px; color: #85858d; line-height: 1.45">{{ c.use }}</span>
+          </div>
+        </sc-for>
+      </div>
+      <p style="margin: 0; font-size: 13.5px; color: #85858d; line-height: 1.6; max-width: 68ch">Акцент интерфейса намеренно холодный: зелёный, жёлтый и красный зарезервированы под градацию оценок и в других ролях не участвуют.</p>
+    </section>
+
+    <section style="display: flex; flex-direction: column; gap: 16px; padding: 44px 0 0">
+      <h2 style="margin: 0; font-size: 20px; font-weight: 700; letter-spacing: -0.02em">Шрифты</h2>
+      <div style="display: flex; flex-direction: column; gap: 1px; border: 1px solid #232328; border-radius: 10px; overflow: hidden">
+        <sc-for list="{{ type }}" as="t" hint-placeholder-count="6">
+          <div style="display: flex; align-items: baseline; justify-content: space-between; gap: 16px; flex-wrap: wrap; padding: 14px 15px; background: #141417">
+            <span style="font-family: {{ t.family }}; font-size: {{ t.size }}; font-weight: {{ t.weight }}; letter-spacing: {{ t.tracking }}; color: #edeef0; line-height: 1.2">{{ t.sample }}</span>
+            <span style="font-family: 'JetBrains Mono', monospace; font-size: 10px; color: #74747c; text-align: right">{{ t.spec }}</span>
+          </div>
+        </sc-for>
+      </div>
+      <p style="margin: 0; font-size: 13.5px; color: #85858d; line-height: 1.6; max-width: 68ch">Sora — заголовки и текст. JetBrains Mono — все числа, подписи шкал, служебные пометки и технические строки. Числа оценок только моно: цифры одной ширины не дёргаются при обновлении.</p>
+    </section>
+
+    <section style="display: flex; flex-direction: column; gap: 16px; padding: 44px 0 0">
+      <h2 style="margin: 0; font-size: 20px; font-weight: 700; letter-spacing: -0.02em">Две шкалы оценок</h2>
+      <p style="margin: 0; font-size: 14.5px; color: #a9aab1; line-height: 1.6; max-width: 68ch">Один и тот же компонент на все места: плашка с числом, суффикс шкалы внутри плашки, полоса заполнения под ней и моно-подпись. Метаскор всегда с <span style="font-family: 'JetBrains Mono', monospace; font-size: 13px; color: #d5d6db">/100</span>, оценка игроков — с <span style="font-family: 'JetBrains Mono', monospace; font-size: 13px; color: #d5d6db">/10</span> и всегда с одним знаком после запятой.</p>
+      <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(170px, 1fr)); gap: 12px">
+        <sc-for list="{{ tiers }}" as="t" hint-placeholder-count="7">
+          <div style="display: flex; align-items: center; gap: 13px; padding: 14px; background: #141417; border: 1px solid #232328; border-radius: 10px">
+            <span style="display: flex; flex-direction: column; align-items: center; gap: 5px; flex: none">
+              <span style="display: grid; place-items: center; font-family: 'JetBrains Mono', monospace; font-weight: 700; line-height: 1; height: 40px; min-width: 40px; padding: 0 9px; font-size: 17px; border-radius: 7px; background: rgba(255,255,255,0.045); color: {{ t.color }}; border: 2px {{ t.bs }} {{ t.bc }}">
+                <span>{{ t.val }}<span style="font-size: 9px; font-weight: 500; opacity: 0.6">{{ t.suffix }}</span></span>
+              </span>
+              <span style="width: 100%; height: 3px; border-radius: 2px; background: {{ t.track }}">
+                <span style="display: block; height: 3px; border-radius: 2px; background: {{ t.bar }}; width: {{ t.barW }}"></span>
+              </span>
+            </span>
+            <span style="display: flex; flex-direction: column; gap: 4px; min-width: 0">
+              <span style="font-size: 12.5px; font-weight: 600">{{ t.label }}</span>
+              <span style="font-family: 'JetBrains Mono', monospace; font-size: 9.5px; color: #74747c; line-height: 1.5">{{ t.range }}</span>
+            </span>
+          </div>
+        </sc-for>
+      </div>
+      <p style="margin: 0; font-size: 13.5px; color: #85858d; line-height: 1.6; max-width: 68ch">Пороги градации считаются от доли шкалы: 0.75 и 0.5. Поэтому 75 и 7.5 — одна и та же зона, а формула одна на оба типа оценок. Значение <span style="font-family: 'JetBrains Mono', monospace; font-size: 13px; color: #d5d6db">0</span> — настоящая оценка и красится в «плохо». Значение <span style="font-family: 'JetBrains Mono', monospace; font-size: 13px; color: #d5d6db">null</span> — не оценка вообще: пунктирная рамка и «нет оценки», никогда не ноль.</p>
+    </section>
+
+    <section style="display: flex; flex-direction: column; gap: 16px; padding: 44px 0 0">
+      <h2 style="margin: 0; font-size: 20px; font-weight: 700; letter-spacing: -0.02em">Неполные данные</h2>
+      <p style="margin: 0; font-size: 14.5px; color: #a9aab1; line-height: 1.6; max-width: 68ch">Доли из брифа — замер по базе из 44 игр. Каждое состояние есть в макете, в списке состояний служебной панели.</p>
+      <div style="display: flex; flex-direction: column; gap: 1px; border: 1px solid #232328; border-radius: 10px; overflow: hidden">
+        <div style="display: flex; gap: 12px; padding: 10px 15px; background: #1a1a1e; font-family: 'JetBrains Mono', monospace; font-size: 9.5px; letter-spacing: 0.05em; color: #74747c">
+          <span style="flex: 1 1 200px; min-width: 0">СЛУЧАЙ</span>
+          <span style="flex: none; width: 62px">ДОЛЯ</span>
+          <span style="flex: 1 1 260px; min-width: 0">РЕШЕНИЕ В МАКЕТЕ</span>
+        </div>
+        <sc-for list="{{ gaps }}" as="g" hint-placeholder-count="10">
+          <div style="display: flex; gap: 12px; flex-wrap: wrap; padding: 12px 15px; background: #141417">
+            <span style="flex: 1 1 200px; min-width: 0; font-size: 13.5px; font-weight: 500">{{ g.case }}</span>
+            <span style="flex: none; width: 62px; font-family: 'JetBrains Mono', monospace; font-size: 12px; color: {{ g.shareColor }}">{{ g.share }}</span>
+            <span style="flex: 1 1 260px; min-width: 0; font-size: 13px; color: #a9aab1; line-height: 1.5">{{ g.fix }}</span>
+          </div>
+        </sc-for>
+      </div>
+    </section>
+
+    <section style="display: flex; flex-direction: column; gap: 16px; padding: 44px 0 0">
+      <h2 style="margin: 0; font-size: 20px; font-weight: 700; letter-spacing: -0.02em">Обложки</h2>
+      <div style="display: flex; flex-direction: column; gap: 10px">
+        <sc-for list="{{ covers }}" as="c" hint-placeholder-count="4">
+          <div style="display: flex; gap: 13px; align-items: flex-start; padding: 14px 15px; background: #141417; border: 1px solid #232328; border-radius: 10px">
+            <span style="flex: none; font-family: 'JetBrains Mono', monospace; font-size: 10px; color: oklch(0.78 0.13 205); padding-top: 2px">{{ c.n }}</span>
+            <span style="display: flex; flex-direction: column; gap: 5px; min-width: 0">
+              <span style="font-size: 13.5px; font-weight: 600">{{ c.title }}</span>
+              <span style="font-size: 13px; color: #a9aab1; line-height: 1.55; text-wrap: pretty">{{ c.note }}</span>
+            </span>
+          </div>
+        </sc-for>
+      </div>
+    </section>
+
+    <section style="display: flex; flex-direction: column; gap: 16px; padding: 44px 0 0">
+      <h2 style="margin: 0; font-size: 20px; font-weight: 700; letter-spacing: -0.02em">Список: адрес и подгрузка</h2>
+      <div style="display: flex; flex-direction: column; gap: 1px; border: 1px solid #232328; border-radius: 10px; overflow: hidden">
+        <sc-for list="{{ urlRules }}" as="u" hint-placeholder-count="5">
+          <div style="display: flex; gap: 14px; flex-wrap: wrap; padding: 12px 15px; background: #141417">
+            <span style="flex: none; width: 148px; font-family: 'JetBrains Mono', monospace; font-size: 11.5px; color: #79a9b8">{{ u.k }}</span>
+            <span style="flex: 1 1 260px; min-width: 0; font-size: 13px; color: #c8c9cf; line-height: 1.55">{{ u.v }}</span>
+          </div>
+        </sc-for>
+      </div>
+      <p style="margin: 0; font-size: 13.5px; color: #85858d; line-height: 1.6; max-width: 68ch">Автоподгрузка срабатывает за 400 px до конца страницы и дублируется кнопкой «Показать ещё» — на случай клавиатуры, чтения с экрана и обрыва наблюдателя. При переходе в карточку запоминается позиция прокрутки и число загруженных страниц, при возврате — восстанавливается.</p>
+    </section>
+
+    <section style="display: flex; flex-direction: column; gap: 16px; padding: 44px 0 0">
+      <h2 style="margin: 0; font-size: 20px; font-weight: 700; letter-spacing: -0.02em">Экран мониторинга</h2>
+      <p style="margin: 0; font-size: 14.5px; color: #a9aab1; line-height: 1.6; max-width: 68ch">Служебный экран отдельным маршрутом — <a href="Мониторинг.dc.html">Мониторинг</a>. Аудитория другая, поэтому из каталога на него ссылки нет; в макете есть переключатель восьми состояний потока.</p>
+      <div style="display: flex; flex-direction: column; gap: 10px">
+        <sc-for list="{{ monitoring }}" as="m" hint-placeholder-count="6">
+          <div style="display: flex; gap: 13px; align-items: flex-start; padding: 14px 15px; background: #141417; border: 1px solid #232328; border-radius: 10px">
+            <span style="flex: none; font-family: 'JetBrains Mono', monospace; font-size: 10px; color: oklch(0.78 0.13 205); padding-top: 2px">{{ m.n }}</span>
+            <span style="display: flex; flex-direction: column; gap: 5px; min-width: 0">
+              <span style="font-size: 13.5px; font-weight: 600">{{ m.title }}</span>
+              <span style="font-size: 13px; color: #a9aab1; line-height: 1.55; text-wrap: pretty">{{ m.note }}</span>
+            </span>
+          </div>
+        </sc-for>
+      </div>
+    </section>
+
+    <section style="display: flex; flex-direction: column; gap: 16px; padding: 44px 0 0">
+      <h2 style="margin: 0; font-size: 20px; font-weight: 700; letter-spacing: -0.02em">Клавиатура и доступность</h2>
+      <div style="display: flex; flex-direction: column; gap: 10px">
+        <sc-for list="{{ a11y }}" as="a" hint-placeholder-count="6">
+          <div style="display: flex; gap: 13px; align-items: flex-start; padding: 14px 15px; background: #141417; border: 1px solid #232328; border-radius: 10px">
+            <span style="flex: none; font-family: 'JetBrains Mono', monospace; font-size: 10px; color: oklch(0.78 0.13 205); padding-top: 2px">{{ a.n }}</span>
+            <span style="display: flex; flex-direction: column; gap: 5px; min-width: 0">
+              <span style="font-size: 13.5px; font-weight: 600">{{ a.title }}</span>
+              <span style="font-size: 13px; color: #a9aab1; line-height: 1.55; text-wrap: pretty">{{ a.note }}</span>
+            </span>
+          </div>
+        </sc-for>
+      </div>
+    </section>
+
+    <section style="display: flex; flex-direction: column; gap: 16px; padding: 44px 0 0">
+      <h2 style="margin: 0; font-size: 20px; font-weight: 700; letter-spacing: -0.02em">Ошибки API</h2>
+      <div style="display: flex; flex-direction: column; gap: 10px">
+        <sc-for list="{{ errors }}" as="e" hint-placeholder-count="3">
+          <div style="display: flex; gap: 14px; align-items: flex-start; padding: 14px 15px; background: #141417; border: 1px solid #232328; border-radius: 10px">
+            <span style="flex: none; font-family: 'JetBrains Mono', monospace; font-size: 15px; font-weight: 700; color: {{ e.color }}">{{ e.code }}</span>
+            <span style="display: flex; flex-direction: column; gap: 5px; min-width: 0">
+              <span style="font-size: 13.5px; font-weight: 600">{{ e.title }}</span>
+              <span style="font-size: 13px; color: #a9aab1; line-height: 1.55; text-wrap: pretty">{{ e.note }}</span>
+            </span>
+          </div>
+        </sc-for>
+      </div>
+    </section>
+
+    <section style="display: flex; flex-direction: column; gap: 16px; padding: 44px 0 0">
+      <h2 style="margin: 0; font-size: 20px; font-weight: 700; letter-spacing: -0.02em">Ширины и сетка</h2>
+      <div style="display: flex; flex-direction: column; gap: 1px; border: 1px solid #232328; border-radius: 10px; overflow: hidden">
+        <sc-for list="{{ grid }}" as="r" hint-placeholder-count="3">
+          <div style="display: flex; gap: 14px; flex-wrap: wrap; padding: 12px 15px; background: #141417">
+            <span style="flex: none; width: 148px; font-family: 'JetBrains Mono', monospace; font-size: 11.5px; color: #79a9b8">{{ r.k }}</span>
+            <span style="flex: 1 1 260px; min-width: 0; font-size: 13px; color: #c8c9cf; line-height: 1.55">{{ r.v }}</span>
+          </div>
+        </sc-for>
+      </div>
+      <p style="margin: 0; font-size: 13.5px; color: #85858d; line-height: 1.6; max-width: 68ch">Обложка везде 3:4 с фиксированным аспектом, отступы кратны 4 px, радиусы 6 / 9 / 11 px, служебная панель в продакшене не нужна.</p>
+    </section>
+
+  </div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script>
+const GOOD = 'oklch(0.72 0.19 145)', MIXED = 'oklch(0.82 0.16 92)', BAD = 'oklch(0.64 0.21 25)', ACCENT = 'oklch(0.78 0.13 205)';
+
+class Component extends DCLogic {
+  renderVals() {
+    const tier = (val, suffix, color, label, range, barW) => ({
+      val, suffix, color, label, range, barW, bar: color, track: '#26262b', bs: 'solid', bc: 'transparent'
+    });
+    return {
+      colors: [
+        { name: 'Фон', value: '#0c0c0d', use: 'страница' },
+        { name: 'Поверхность', value: '#141417', use: 'карточки, строки таблиц' },
+        { name: 'Поверхность 2', value: '#1a1a1e', use: 'шапки таблиц, поля' },
+        { name: 'Рамка', value: '#232328', use: 'границы, разделители' },
+        { name: 'Текст', value: '#edeef0', use: 'основной' },
+        { name: 'Текст тихий', value: '#8b8b93', use: 'пояснения, пустые состояния' },
+        { name: 'Акцент', value: 'oklch(0.78 0.13 205)', use: 'выбранное, ссылки, фокус' },
+        { name: 'Хорошо', value: GOOD, use: 'оценка 75–100 / 7.5–10' },
+        { name: 'Средне', value: MIXED, use: 'оценка 50–74 / 5.0–7.4' },
+        { name: 'Плохо', value: BAD, use: 'оценка 0–49 / 0–4.9' },
+        { name: 'idle / info', value: '#22232a', use: 'пилюля простоя, уровень info в журнале' },
+        { name: 'running', value: 'rgba(60,150,180,0.14)', use: 'фон пилюли «работает», текст акцентом' },
+        { name: 'error / warn', value: 'rgba(180,60,40,0.14)', use: 'фон пилюли ошибки; warn — то же с жёлтым' }
+      ],
+      type: [
+        { sample: 'Onimusha: Way of the Sword', family: "'Sora', sans-serif", size: '30px', weight: '700', tracking: '-0.025em', spec: 'Sora 700 · 38/27px · заголовок карточки игры' },
+        { sample: 'Оценки по платформам', family: "'Sora', sans-serif", size: '17px', weight: '600', tracking: '-0.01em', spec: 'Sora 600 · 17px · заголовок блока' },
+        { sample: 'Neon Vaults', family: "'Sora', sans-serif", size: '15px', weight: '600', tracking: '-0.01em', spec: 'Sora 600 · 15px · название в списке' },
+        { sample: 'Резюме отзывов и описания', family: "'Sora', sans-serif", size: '14px', weight: '400', tracking: '0', spec: 'Sora 400 · 13.5–15px · текст, 1.6' },
+        { sample: '89/100', family: "'JetBrains Mono', monospace", size: '18px', weight: '700', tracking: '0', spec: 'Mono 700 · 12–22px · числа оценок' },
+        { sample: 'КРИТИКИ 0–100', family: "'JetBrains Mono', monospace", size: '10px', weight: '500', tracking: '0.05em', spec: 'Mono 500 · 9–11px · подписи и служебное' }
+      ],
+      tiers: [
+        tier('89', '/100', GOOD, 'Хорошо', 'метаскор 75–100', '89%'),
+        tier('62', '/100', MIXED, 'Средне', 'метаскор 50–74', '62%'),
+        tier('47', '/100', BAD, 'Плохо', 'метаскор 0–49', '47%'),
+        tier('9.3', '/10', GOOD, 'Хорошо', 'игроки 7.5–10', '93%'),
+        tier('6.4', '/10', MIXED, 'Средне', 'игроки 5.0–7.4', '64%'),
+        tier('0.0', '/10', BAD, 'Ноль — это оценка', 'игроки 0–4.9', '0%'),
+        { val: '—', suffix: '', color: '#64646c', label: 'Нет оценки', range: 'null — не оценивали', bar: 'transparent', track: '#1e1e23', bs: 'dashed', bc: '#33333a', barW: '0%' }
+      ],
+      gaps: [
+        { case: 'Нет трейлера', share: '89%', shareColor: BAD, fix: 'Блока видео нет вовсе, ничего не сообщаем' },
+        { case: 'Нет ESRB', share: '70%', shareColor: BAD, fix: 'Строка в таблице фактов отсутствует' },
+        { case: 'Нет метаскора у платформы', share: '62%', shareColor: BAD, fix: '«нет оценки» вместо плашки, рядом число рецензий' },
+        { case: 'Нет оценки игроков у платформы', share: '56%', shareColor: BAD, fix: 'То же; полоса заполнения не рисуется' },
+        { case: 'Нет отзывов и резюме', share: '55%', shareColor: BAD, fix: 'Блок «Отзывов пока нет» с пояснением про свежий релиз' },
+        { case: 'Резюме только одного вида', share: '7 из 20', shareColor: MIXED, fix: 'Две колонки остаются; в пустой — «рецензий ещё нет»' },
+        { case: 'Нет описания', share: '30%', shareColor: MIXED, fix: 'Пунктирная плашка «Описание Metacritic не публикует»' },
+        { case: 'Нет обложки', share: '11%', shareColor: MIXED, fix: 'Название игры на штриховке, тот же аспект 3:4' },
+        { case: 'Похожих не нашлось', share: 'часто', shareColor: MIXED, fix: 'Пустой блок с пояснением; случайные игры не подставляем' },
+        { case: 'Поиск ничего не нашёл', share: '—', shareColor: '#74747c', fix: 'Запрос в заголовке, напоминание про поиск по названию, сброс отбора' },
+        { case: 'База пуста', share: 'первый запуск', shareColor: '#74747c', fix: 'Экран про обход раз в час и «последний обход: ещё не было»' },
+        { case: 'status: failed', share: 'редко', shareColor: '#74747c', fix: 'Игра остаётся в списке с пометкой; в карточке — полоса предупреждения' }
+      ],
+      covers: [
+        { n: '01', title: 'Аспект задаётся до загрузки', note: 'Контейнер 3:4 с фоном-штриховкой. Картинка приходит в него — сетка не дёргается ни при медленной загрузке, ни при отсутствии файла.' },
+        { n: '02', title: 'loading=lazy и decoding=async', note: 'Обложки по 300–500 КБ с чужого домена. Вне экрана они не загружаются; в списке из двух десятков игр это разница между секундой и минутой.' },
+        { n: '03', title: 'Битая ссылка = та же заглушка', note: 'На onerror показываем ту же заглушку, что при coverUrl: null, но с пометкой «ссылка не открылась» — чтобы отличать данные, которых нет, от данных, которые не пришли.' },
+        { n: '04', title: 'Уменьшать нельзя', note: 'Сервер не отдаёт превью, поэтому в списке та же картинка, что в карточке. Размер контейнера ограничен CSS; никаких попыток тянуть исходник под большие плитки.' }
+      ],
+      urlRules: [
+        { k: 'platform', v: 'Точное имя платформы из /api/platforms. Пусто — все платформы' },
+        { k: 'q', v: 'Подстрока названия, регистр не важен. Пустая строка в адрес не пишется' },
+        { k: 'sort', v: 'metascore | userscore | date | title. date по умолчанию и в адресе не пишется' },
+        { k: 'page, pageSize', v: 'pageSize 24 запросом; в макете шаг подгрузки 8 для наглядности' },
+        { k: 'адрес карточки', v: '/game/:slug — открывается ссылкой, работает без списка' },
+        { k: 'устаревший обход', v: 'Если последний удачный обход был больше суток назад — полоса role="status" над отбором с точным временем и часами; список при этом показывается как обычно' },
+        { k: 'длинные данные', v: 'Название до шести слов без переносов, шесть платформ в таблице, по пять пунктов резюме до 120 знаков — проверено сценарием «очень длинные данные»' }
+      ],
+      monitoring: [
+        { n: '01', title: 'Живость — не журнал, а снимки', note: 'События редки: между началом и концом обхода бывает пять минут тишины. Признак жизни — «чем занят» и счётчики, они меняются на каждой записи. Пустой журнал во время цикла получает отдельное объяснение, а не выглядит поломкой.' },
+        { n: '02', title: 'Первый кадр SSE — снимок', note: 'Отдельный GET /api/status перед подпиской не нужен. При обрыве переподключаемся, показывая честно «нет связи, переподключение через N с»; числа на экране помечаются как последний полученный снимок.' },
+        { n: '03', title: 'Ошибка воркера — не отказ сервиса', note: 'Этапы идут по очереди, но сбой одного не отменяет следующие. Поэтому error окрашивает только свою карточку; общее состояние цикла остаётся «идёт».' },
+        { n: '04', title: 'Три исхода кнопки запуска', note: '202 — «цикл запущен», кнопка блокируется; 409 — «уже идёт», подаётся нейтрально, не как ошибка; 503 — «планировщик выключен», кнопка неактивна с пояснением. Кнопка не ждёт окончания цикла.' },
+        { n: '05', title: 'Счётчики накопительные', note: 'processedTotal и failedTotal — за всё время жизни сервиса, а не за цикл. Ошибки заметны цветом, но не кричат: часть игр у источника битая, это норма. Красный включается, только когда ошибок больше успехов.' },
+        { n: '07', title: 'Токены состояний', note: 'Воркер: idle — серая пилюля #22232a, running — акцент с пульсирующей точкой, error — красная. Журнал: info серый, warn жёлтый, error красный. Пульсация только у «работает» и у индикатора связи: два места, где движение означает жизнь.' },
+        { n: '06', title: 'data события — свёрнуто', note: 'Объект показывается по кнопке с aria-expanded, моно-шрифтом и с горизонтальной прокруткой. Сырой JSON без возможности свернуть в ленту не выводится.' }
+      ],
+      a11y: [
+        { n: '01', title: 'Карточка игры — кнопка, а не блок с обработчиком', note: 'В списке и в блоке похожих: role="button", tabindex, Enter и пробел, aria-label «Открыть карточку игры …». В Vue это <button> или <router-link> — тогда роли и клавиатура достаются бесплатно.' },
+        { n: '02', title: 'Видимый фокус', note: 'Обводка акцентным цветом 2 px с отступом 3 px через :focus-visible — только для клавиатуры, мышь её не показывает. Наведение и фокус — разные состояния.' },
+        { n: '03', title: 'Фильтр и сортировка', note: 'Каждая группа в role="group" со своей подписью, у каждой кнопки aria-pressed. Поле поиска — type="search" с aria-label; visible-подписи нет, поэтому подпись обязательна.' },
+        { n: '04', title: 'Модальное окно трейлера', note: 'role="dialog", aria-modal, фокус уезжает на кнопку закрытия при открытии и возвращается на исходный элемент при закрытии. Esc и клик по фону закрывают.' },
+        { n: '05', title: 'Полоса устаревшего обхода', note: 'role="status" — экранный диктор сообщит о ней, не перебивая пользователя.' },
+        { n: '06', title: 'Цели нажатия', note: 'На мобильной ширине — не меньше 44 px по короткой стороне: чипы платформ, кнопки сортировки, «Показать ещё».' }
+      ],
+      errors: [
+        { code: '404', color: MIXED, title: 'Неизвестный slug или маршрут', note: 'Отдельный экран: код, «Такой игры в каталоге нет», объяснение про обход раз в час и кнопка ко всем играм. Не показываем пустую карточку.' },
+        { code: '500', color: BAD, title: 'Сбой на сервере', note: '«Сервис не ответил», обещание, что с каталогом всё в порядке, и кнопка «Обновить». Отбор в адресе сохраняется.' },
+        { code: '400', color: ACCENT, title: 'Негодные параметры запроса', note: 'Пользователь может получить его, только вписав мусор в адрес: чиним отбор на значения по умолчанию и показываем список, не экран ошибки.' }
+      ],
+      grid: [
+        { k: 'desktop 1280', v: 'Сетка списка 5 колонок; карточка игры — 300 px обложка + гибкая колонка; резюме в две колонки' },
+        { k: 'tablet 834', v: 'Сетка 3 колонки; карточка игры в два столбца; резюме одной колонкой' },
+        { k: 'mobile 390', v: 'Сетка 2 колонки; всё в один столбец; фильтр платформ прокручивается по горизонтали; цели нажатия от 44 px' }
+      ]
+    };
+  }
+}
+</script>
+</body>
+</html>

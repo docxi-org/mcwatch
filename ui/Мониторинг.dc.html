@@ -1,0 +1,467 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Sora:wght@400;600;700;800&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+<style>
+  html, body { margin: 0; padding: 0; background: #0c0c0d; }
+  body { font-family: 'Sora', system-ui, sans-serif; -webkit-font-smoothing: antialiased; }
+  a { color: oklch(0.78 0.13 205); text-decoration: none; }
+  a:hover { color: oklch(0.88 0.10 205); }
+  ::selection { background: oklch(0.78 0.13 205); color: #0c0c0d; }
+  :focus-visible { outline: 2px solid oklch(0.78 0.13 205); outline-offset: 3px; border-radius: 4px; }
+  input, select, button { font-family: inherit; }
+  @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.25; } }
+  .noscroll::-webkit-scrollbar { height: 6px; width: 6px; }
+  .noscroll::-webkit-scrollbar-thumb { background: #2c2c31; border-radius: 3px; }
+</style>
+</helmet>
+
+<div style="min-height: 100vh; background: #0c0c0d; color: #edeef0; padding-bottom: 80px">
+
+  <sc-if value="{{ showBar }}" hint-placeholder-val="{{ true }}">
+    <div style="position: sticky; top: 0; z-index: 50; display: flex; flex-wrap: wrap; align-items: center; gap: 8px 18px; padding: 9px 16px; background: #17171a; border-bottom: 1px solid #26262b; font-family: 'JetBrains Mono', monospace; font-size: 11px; color: #8b8b93">
+      <span style="display: flex; align-items: center; gap: 7px; color: #cfd0d4; letter-spacing: 0.04em">
+        <span style="width: 7px; height: 7px; border-radius: 2px; background: oklch(0.78 0.13 205)"></span>МАКЕТ
+      </span>
+      <label style="display: flex; align-items: center; gap: 7px">СОСТОЯНИЕ
+        <select value="{{ scenario }}" onChange="{{ setScenario }}" style="background: #202025; color: #edeef0; border: 1px solid #33333a; border-radius: 5px; padding: 4px 7px; font-size: 11px; max-width: 260px">
+          <sc-for list="{{ scenarios }}" as="s" hint-placeholder-count="6">
+            <option value="{{ s.id }}">{{ s.name }}</option>
+          </sc-for>
+        </select>
+      </label>
+      <span style="display: flex; align-items: center; gap: 6px">ШИРИНА
+        <sc-for list="{{ vpOptions }}" as="v" hint-placeholder-count="3">
+          <button onClick="{{ v.pick }}" style="cursor: pointer; border-radius: 5px; padding: 4px 8px; font-size: 11px; border: 1px solid {{ v.bc }}; background: {{ v.bg }}; color: {{ v.fg }}">{{ v.label }}</button>
+        </sc-for>
+      </span>
+      <span style="margin-left: auto; padding: 4px 9px; border-radius: 5px; background: #101013; border: 1px solid #26262b; color: #79a9b8; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 46%">{{ url }}</span>
+    </div>
+  </sc-if>
+
+  <div style="width: {{ vpWidth }}; margin: 0 auto; padding: 0 16px; box-sizing: border-box">
+
+    <header style="display: flex; align-items: baseline; justify-content: space-between; gap: 16px; flex-wrap: wrap; padding: 26px 0 20px; border-bottom: 1px solid #1e1e22">
+      <div style="display: flex; align-items: baseline; gap: 12px; flex-wrap: wrap">
+        <span style="font-size: 25px; font-weight: 800; letter-spacing: -0.03em; color: #f4f5f7">mcwatch<span style="color: oklch(0.78 0.13 205)">.</span></span>
+        <span style="font-size: 13px; color: #85858d">мониторинг сервиса</span>
+        <a href="mcwatch.dc.html" style="font-family: 'JetBrains Mono', monospace; font-size: 11px">→ каталог</a>
+      </div>
+      <span role="status" style="display: flex; align-items: center; gap: 8px; font-family: 'JetBrains Mono', monospace; font-size: 11px; color: {{ conn.color }}">
+        <span style="width: 8px; height: 8px; border-radius: 999px; background: {{ conn.color }}; animation: {{ conn.anim }}"></span>{{ conn.text }}
+      </span>
+    </header>
+
+    <sc-if value="{{ offline }}">
+      <div role="status" style="display: flex; gap: 12px; align-items: flex-start; margin-top: 20px; padding: 13px 15px; border-radius: 9px; background: rgba(190,150,40,0.08); border: 1px solid oklch(0.5 0.09 92)">
+        <span style="flex: none; font-family: 'JetBrains Mono', monospace; font-size: 10px; letter-spacing: 0.06em; padding: 3px 6px; border-radius: 4px; background: oklch(0.82 0.16 92); color: #17130a">SSE</span>
+        <span style="display: flex; flex-direction: column; gap: 5px; min-width: 0">
+          <span style="font-size: 13.5px; color: #ddc9a3; line-height: 1.55">{{ offlineText }}</span>
+          <span style="font-family: 'JetBrains Mono', monospace; font-size: 10.5px; color: #a8916a">Числа ниже — последний полученный снимок, они могли устареть.</span>
+        </span>
+      </div>
+    </sc-if>
+
+    <section style="display: flex; flex-wrap: wrap; align-items: center; gap: 14px; padding: 22px 0 0">
+      <div style="display: flex; align-items: center; gap: 13px; flex: 1 1 320px; min-width: 0; padding: 15px 17px; background: #141417; border: 1px solid #232328; border-radius: 11px">
+        <span style="flex: none; width: 10px; height: 10px; border-radius: 999px; background: {{ cycle.color }}; animation: {{ cycle.anim }}"></span>
+        <span style="display: flex; flex-direction: column; gap: 4px; min-width: 0">
+          <span style="font-size: 15px; font-weight: 600">{{ cycle.title }}</span>
+          <span style="font-family: 'JetBrains Mono', monospace; font-size: 10.5px; color: #7d7d85; line-height: 1.5">{{ cycle.note }}</span>
+        </span>
+      </div>
+      <div style="display: flex; flex-direction: column; gap: 8px; flex: 1 1 220px">
+        <button onClick="{{ run }}" disabled="{{ runDisabled }}" style="cursor: {{ runCursor }}; width: 100%; min-height: 46px; padding: 0 20px; white-space: nowrap; border-radius: 10px; font-size: 14px; font-weight: 600; border: 1px solid {{ runBc }}; background: {{ runBg }}; color: {{ runFg }}">{{ runLabel }}</button>
+      </div>
+    </section>
+
+    <sc-if value="{{ runResult.show }}">
+      <div role="status" style="display: flex; gap: 12px; align-items: flex-start; margin-top: 12px; padding: 12px 15px; border-radius: 9px; background: {{ runResult.bg }}; border: 1px solid {{ runResult.bc }}">
+        <span style="flex: none; font-family: 'JetBrains Mono', monospace; font-size: 11px; font-weight: 700; color: {{ runResult.fg }}">{{ runResult.code }}</span>
+        <span style="font-size: 13.5px; color: #d5d6db; line-height: 1.5">{{ runResult.text }}</span>
+      </div>
+    </sc-if>
+
+    <sc-if value="{{ fresh }}">
+      <div style="display: flex; flex-direction: column; gap: 10px; align-items: flex-start; margin-top: 26px; padding: 44px 22px; border: 1px dashed #2c2c33; border-radius: 12px">
+        <span style="font-size: 19px; font-weight: 600">Работы ещё не было</span>
+        <span style="font-size: 14px; color: #8b8b93; line-height: 1.6; max-width: 60ch; text-wrap: pretty">Сервис запущен, но ни один воркер пока не отработал: счётчиков и журнала нет, обход не начинался. Первый цикл пойдёт автоматически в начале часа — или нажмите «Запустить сейчас».</span>
+        <span style="font-family: 'JetBrains Mono', monospace; font-size: 10.5px; color: #5f5f67; margin-top: 4px">GET /api/status → workers: [], crawl: null</span>
+      </div>
+    </sc-if>
+
+    <sc-if value="{{ hasWorkers }}" hint-placeholder-val="{{ true }}">
+      <section style="display: flex; flex-direction: column; gap: 12px; padding: 34px 0 0">
+        <div style="display: flex; align-items: baseline; justify-content: space-between; gap: 12px">
+          <h2 style="margin: 0; font-size: 17px; font-weight: 600; letter-spacing: -0.01em">Воркеры</h2>
+          <span style="font-family: 'JetBrains Mono', monospace; font-size: 10px; color: #5f5f67">идут по очереди · сбой этапа не отменяет следующие</span>
+        </div>
+        <div style="display: grid; grid-template-columns: {{ workerCols }}; gap: 14px">
+          <sc-for list="{{ workers }}" as="w" hint-placeholder-count="3">
+            <div style="display: flex; flex-direction: column; gap: 14px; padding: 17px 18px; background: #141417; border: 1px solid #232328; border-radius: 11px; border-top: 2px solid {{ w.accent }}">
+              <div style="display: flex; align-items: center; justify-content: space-between; gap: 10px">
+                <span style="font-family: 'JetBrains Mono', monospace; font-size: 13px; font-weight: 700; color: #edeef0">{{ w.worker }}</span>
+                <span style="display: flex; align-items: center; gap: 6px; font-family: 'JetBrains Mono', monospace; font-size: 9.5px; letter-spacing: 0.06em; padding: 4px 8px; border-radius: 5px; background: {{ w.pillBg }}; color: {{ w.pillFg }}">
+                  <span style="width: 6px; height: 6px; border-radius: 999px; background: {{ w.pillFg }}; animation: {{ w.anim }}"></span>{{ w.stateText }}
+                </span>
+              </div>
+
+              <div style="display: flex; flex-direction: column; gap: 5px; min-height: 52px">
+                <span style="font-family: 'JetBrains Mono', monospace; font-size: 9.5px; letter-spacing: 0.06em; color: #74747c">{{ w.roleText }}</span>
+                <span style="font-size: 14px; font-weight: 500; line-height: 1.4; color: {{ w.itemColor }}; text-wrap: pretty">{{ w.currentItem }}</span>
+              </div>
+
+              <div style="display: flex; gap: 10px">
+                <span style="flex: 1 1 0; display: flex; flex-direction: column; gap: 4px; padding: 10px 12px; background: #191a1e; border-radius: 8px">
+                  <span style="font-family: 'JetBrains Mono', monospace; font-size: 20px; font-weight: 700; line-height: 1; color: #edeef0">{{ w.processed }}</span>
+                  <span style="font-family: 'JetBrains Mono', monospace; font-size: 9px; letter-spacing: 0.05em; color: #74747c">ОБРАБОТАНО</span>
+                </span>
+                <span style="flex: 1 1 0; display: flex; flex-direction: column; gap: 4px; padding: 10px 12px; background: #191a1e; border-radius: 8px">
+                  <span style="font-family: 'JetBrains Mono', monospace; font-size: 20px; font-weight: 700; line-height: 1; color: {{ w.failColor }}">{{ w.failed }}</span>
+                  <span style="font-family: 'JetBrains Mono', monospace; font-size: 9px; letter-spacing: 0.05em; color: #74747c">ОШИБОК</span>
+                </span>
+              </div>
+
+              <span style="font-family: 'JetBrains Mono', monospace; font-size: 10px; color: #6f6f77">{{ w.lastRunText }}</span>
+
+              <sc-if value="{{ w.hasError }}">
+                <span style="display: flex; flex-direction: column; gap: 5px; padding: 10px 12px; border-radius: 8px; background: rgba(180,60,40,0.09); border: 1px solid oklch(0.42 0.1 25)">
+                  <span style="font-family: 'JetBrains Mono', monospace; font-size: 9px; letter-spacing: 0.06em; color: oklch(0.75 0.16 25)">ПОСЛЕДНЯЯ ОШИБКА</span>
+                  <span style="font-size: 12.5px; color: #d8b6ae; line-height: 1.5; word-break: break-word">{{ w.lastError }}</span>
+                </span>
+              </sc-if>
+            </div>
+          </sc-for>
+        </div>
+        <span style="font-size: 12.5px; color: #6f6f77; line-height: 1.5">Счётчики накопительные — за всё время жизни сервиса, а не за последний цикл.</span>
+      </section>
+
+      <section style="display: flex; flex-direction: column; gap: 12px; padding: 34px 0 0">
+        <h2 style="margin: 0; font-size: 17px; font-weight: 600; letter-spacing: -0.01em">Обход</h2>
+        <sc-if value="{{ hasCrawl }}" hint-placeholder-val="{{ true }}">
+          <div style="display: grid; grid-template-columns: {{ crawlCols }}; gap: 1px; border: 1px solid #232328; border-radius: 10px; overflow: hidden">
+            <sc-for list="{{ crawlFacts }}" as="f" hint-placeholder-count="4">
+              <div style="display: flex; flex-direction: column; gap: 6px; padding: 14px 15px; background: #141417">
+                <span style="font-family: 'JetBrains Mono', monospace; font-size: 9.5px; letter-spacing: 0.05em; color: #74747c">{{ f.k }}</span>
+                <span style="font-size: 15px; font-weight: 600; color: #edeef0">{{ f.v }}</span>
+                <span style="font-family: 'JetBrains Mono', monospace; font-size: 10px; color: #6f6f77; line-height: 1.5">{{ f.note }}</span>
+              </div>
+            </sc-for>
+          </div>
+        </sc-if>
+        <sc-if value="{{ noCrawl }}">
+          <div style="padding: 22px; border: 1px dashed #2c2c33; border-radius: 10px">
+            <span style="font-size: 13.5px; color: #8b8b93">Обхода ещё не было — <span style="font-family: 'JetBrains Mono', monospace; font-size: 12.5px; color: #a9aab1">crawl: null</span>. Дата, фаза и страница появятся после первого захода на Metacritic.</span>
+          </div>
+        </sc-if>
+      </section>
+
+      <section style="display: flex; flex-direction: column; gap: 12px; padding: 34px 0 0">
+        <div style="display: flex; align-items: baseline; justify-content: space-between; gap: 12px; flex-wrap: wrap">
+          <h2 style="margin: 0; font-size: 17px; font-weight: 600; letter-spacing: -0.01em">Журнал событий</h2>
+          <span style="font-family: 'JetBrains Mono', monospace; font-size: 10px; color: #5f5f67">{{ journalNote }}</span>
+        </div>
+        <sc-if value="{{ hasEvents }}" hint-placeholder-val="{{ true }}">
+          <div role="log" aria-label="Журнал событий" aria-live="polite" style="display: flex; flex-direction: column; gap: 1px; border: 1px solid #232328; border-radius: 10px; overflow: hidden">
+            <sc-for list="{{ events }}" as="e" hint-placeholder-count="6">
+              <div style="display: flex; flex-direction: column; background: #141417">
+                <div style="display: flex; gap: 12px; align-items: flex-start; flex-wrap: wrap; padding: 11px 14px">
+                  <span style="flex: none; font-family: 'JetBrains Mono', monospace; font-size: 10.5px; color: #6f6f77; padding-top: 2px">{{ e.time }}</span>
+                  <span style="flex: none; font-family: 'JetBrains Mono', monospace; font-size: 9.5px; letter-spacing: 0.05em; padding: 3px 7px; border-radius: 5px; background: {{ e.levelBg }}; color: {{ e.levelFg }}">{{ e.levelText }}</span>
+                  <span style="flex: none; font-family: 'JetBrains Mono', monospace; font-size: 10.5px; color: #85858d; padding-top: 2px">{{ e.worker }}</span>
+                  <span style="flex: 1 1 200px; min-width: 0; font-size: 13.5px; color: #d5d6db; line-height: 1.5; text-wrap: pretty">{{ e.message }}</span>
+                  <sc-if value="{{ e.hasData }}">
+                    <button onClick="{{ e.toggle }}" aria-expanded="{{ e.open }}" style="flex: none; cursor: pointer; min-height: 26px; padding: 0 9px; border-radius: 6px; border: 1px solid #33333a; background: #1c1c21; color: #a9aab1; font-family: 'JetBrains Mono', monospace; font-size: 10px" style-hover="border-color: oklch(0.78 0.13 205)">{{ e.toggleText }}</button>
+                  </sc-if>
+                </div>
+                <sc-if value="{{ e.open }}">
+                  <pre class="noscroll" style="margin: 0 14px 13px; padding: 12px 13px; background: #101013; border: 1px solid #232328; border-radius: 8px; font-family: 'JetBrains Mono', monospace; font-size: 11px; line-height: 1.6; color: #a9c7d1; overflow-x: auto">{{ e.dataText }}</pre>
+                </sc-if>
+              </div>
+            </sc-for>
+          </div>
+        </sc-if>
+        <sc-if value="{{ quietJournal }}">
+          <div style="display: flex; flex-direction: column; gap: 8px; padding: 26px 20px; border: 1px dashed #2c2c33; border-radius: 10px">
+            <span style="font-size: 14.5px; font-weight: 600">В журнале тихо</span>
+            <span style="font-size: 13.5px; color: #8b8b93; line-height: 1.55; max-width: 60ch; text-wrap: pretty">Между началом и концом обхода может пройти несколько минут без единой записи. Это не значит, что сервис встал: смотрите на «чем занят» и на счётчики выше — они меняются на каждой обработанной игре.</span>
+          </div>
+        </sc-if>
+      </section>
+    </sc-if>
+
+  </div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;viewport&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;options&quot;:[&quot;desktop&quot;,&quot;tablet&quot;,&quot;mobile&quot;],&quot;default&quot;:&quot;desktop&quot;,&quot;tsType&quot;:&quot;'desktop' | 'tablet' | 'mobile'&quot;,&quot;section&quot;:&quot;Макет&quot;},&quot;showSpecBar&quot;:{&quot;editor&quot;:&quot;boolean&quot;,&quot;default&quot;:true,&quot;tsType&quot;:&quot;boolean&quot;,&quot;section&quot;:&quot;Макет&quot;}}">
+const ACCENT = 'oklch(0.78 0.13 205)', GOOD = 'oklch(0.72 0.19 145)', MIXED = 'oklch(0.82 0.16 92)', BAD = 'oklch(0.64 0.21 25)';
+const T0 = Date.parse('2026-09-07T12:00:00.000Z');
+
+const TITLES = ['Onimusha: Way of the Sword', 'Neon Vaults', 'Last Light of Arden', 'Resonance: A Plague Tale Legacy', 'Apex of Thieves', 'Tidebound', 'Vector Siege', 'Hollow Signal', 'Skyward Tactics', 'Grand Prix 2027'];
+const ROLE = { crawler: 'ОБХОДИТ METACRITIC', summarizer: 'ПРОСИТ РЕЗЮМЕ У НЕЙРОСЕТИ', embedder: 'СЧИТАЕТ ВЕКТОРЫ' };
+
+const base = (worker, state, item, processed, failed, lastRun, lastError) => ({ worker, state, currentItem: item, processedTotal: processed, failedTotal: failed, lastRunAt: lastRun, lastError });
+
+class Component extends DCLogic {
+  state = {
+    scenario: 'running', vp: this.props.viewport || 'desktop', tick: 0,
+    connected: true, reconnectIn: 0, schedulerEnabled: true, cycleRunning: true, quiet: false,
+    workers: [
+      base('crawler', 'running', 'Onimusha: Way of the Sword', 42, 1, T0 - 60000, null),
+      base('summarizer', 'idle', null, 20, 0, T0 - 3600000, null),
+      base('embedder', 'idle', null, 44, 0, T0 - 3600000, null)
+    ],
+    crawl: { date: '2026-09-07', phase: 'landing', nextPage: 1, processedToday: 20 },
+    events: [
+      { id: 128, ts: T0 - 9000, worker: 'crawler', level: 'info', message: 'заход начат', data: { date: '2026-09-07', target: { phase: 'landing', nextPage: 1 } } },
+      { id: 127, ts: T0 - 240000, worker: 'embedder', level: 'info', message: 'векторы пересчитаны', data: { games: 44, dim: 384, ms: 812 } },
+      { id: 126, ts: T0 - 300000, worker: 'summarizer', level: 'warn', message: 'резюме не составлено: rust-and-rain', data: { reason: 'отзывов меньше трёх', criticReviews: 2, userReviews: 0 } },
+      { id: 125, ts: T0 - 900000, worker: 'summarizer', level: 'info', message: 'резюме готовы', data: { games: 6, model: 'z-ai/glm-4.7-flash', tokens: 41208 } },
+      { id: 124, ts: T0 - 3600000, worker: 'crawler', level: 'info', message: 'цикл завершён', data: null }
+    ],
+    nextId: 129, openIds: [], runResult: null, queue: null, step: 0
+  };
+
+  componentDidMount() {
+    this.iv = setInterval(() => {
+      this.setState(s => {
+        const next = { tick: s.tick + 1 };
+        if (!s.connected) {
+          if (s.reconnectIn > 1) next.reconnectIn = s.reconnectIn - 1;
+          else { next.connected = true; next.reconnectIn = 0; }
+          return next;
+        }
+        if (!s.cycleRunning) return next;
+        return Object.assign(next, this.advance(s));
+      });
+    }, 1300);
+  }
+  componentWillUnmount() { clearInterval(this.iv); }
+
+  queueFor(stuck) {
+    const q = [];
+    TITLES.forEach((t, i) => q.push({ worker: 'crawler', item: t, fail: i === 3 }));
+    TITLES.slice(0, 5).forEach((t, i) => q.push({ worker: 'summarizer', item: 'резюме: ' + t, fail: i === 4 }));
+    q.push({ worker: 'embedder', item: 'пачка векторов 1/2' }, { worker: 'embedder', item: 'пачка векторов 2/2' });
+    return q.filter(x => (stuck || []).indexOf(x.worker) < 0);
+  }
+
+  advance(s) {
+    const queue = s.queue || this.queueFor(s.workers.filter(w => w.stuck).map(w => w.worker));
+    if (!queue.length) return { queue };
+    const step = s.step % queue.length;
+    const cur = queue[step];
+    const now = T0 + (s.tick + 1) * 1300;
+    const workers = s.workers.map(w => {
+      if (w.stuck) return w;
+      if (w.worker !== cur.worker) return Object.assign({}, w, { state: 'idle', currentItem: null });
+      const failed = cur.fail ? w.failedTotal + 1 : w.failedTotal;
+      const processed = cur.fail ? w.processedTotal : w.processedTotal + 1;
+      return Object.assign({}, w, { state: 'running', currentItem: cur.item, processedTotal: processed, failedTotal: failed, lastRunAt: now });
+    });
+    const out = { queue, step: step + 1, workers, crawl: Object.assign({}, s.crawl, { processedToday: s.crawl ? s.crawl.processedToday + (cur.fail ? 0 : 1) : 1, phase: step > 6 ? 'browse' : 'landing', nextPage: step > 6 ? 2 : 1 }) };
+    if (!s.quiet) {
+      const fresh = [];
+      let id = s.nextId;
+      const prev = step > 0 ? queue[step - 1] : null;
+      if (prev && prev.worker !== cur.worker) {
+        fresh.push({ id: id++, ts: now - 200, worker: prev.worker, level: 'info', message: 'этап завершён: ' + prev.worker, data: { next: cur.worker } });
+      }
+      if (step === 0 && s.step > 0) {
+        fresh.push({ id: id++, ts: now - 400, worker: 'embedder', level: 'info', message: 'цикл завершён', data: null });
+        fresh.push({ id: id++, ts: now - 300, worker: 'crawler', level: 'info', message: 'заход начат', data: { date: s.crawl ? s.crawl.date : null, target: { phase: 'landing', nextPage: 1 } } });
+      }
+      if (cur.fail) {
+        const slug = cur.item.replace('резюме: ', '').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
+        fresh.push(cur.worker === 'summarizer'
+          ? { id: id++, ts: now, worker: cur.worker, level: 'warn', message: 'резюме не составлено: ' + slug, data: { reason: 'модель вернула пустой ответ', model: 'z-ai/glm-4.7-flash', attempt: 2 } }
+          : { id: id++, ts: now, worker: cur.worker, level: 'warn', message: 'игра не собрана: ' + slug, data: { error: 'HTTP 500 на metacritic.com', attempt: 2, willRetry: false } });
+      }
+      if (fresh.length) {
+        out.events = fresh.reverse().concat(s.events).slice(0, 50);
+        out.nextId = id;
+      }
+    }
+    return out;
+  }
+
+  scenarioList() {
+    return [
+      { id: 'running', name: 'Цикл идёт — поток живой' },
+      { id: 'quiet', name: 'Долгая тишина в журнале' },
+      { id: 'idle', name: 'Простой между циклами' },
+      { id: 'fresh', name: 'Свежий сервис — работы не было' },
+      { id: 'error', name: 'Один воркер с ошибкой' },
+      { id: 'failing', name: 'Ошибок больше, чем успехов' },
+      { id: 'offline', name: 'Поток оборвался' },
+      { id: 'disabled', name: 'Планировщик выключен' },
+      { id: 'run-409', name: 'Ответ на запуск: 409 — цикл уже идёт' },
+      { id: 'run-503', name: 'Ответ на запуск: 503 — планировщик выключен' }
+    ];
+  }
+
+  applyScenario(id) {
+    const s = this.state;
+    const patch = { scenario: id, runResult: null, connected: true, reconnectIn: 0, quiet: false, schedulerEnabled: true, cycleRunning: true, openIds: [], queue: null, step: 0 };
+    if (id !== 'error') patch.workers = s.workers.map(w => Object.assign({}, w, { stuck: false, state: w.state === 'error' ? 'idle' : w.state }));
+    if (id === 'run-409') patch.runResult = 409;
+    if (id === 'run-503') { patch.runResult = 503; patch.schedulerEnabled = false; patch.cycleRunning = false; patch.workers = s.workers.map(w => Object.assign({}, w, { state: 'idle', currentItem: null, stuck: false })); }
+    if (id === 'quiet') patch.quiet = true;
+    if (id === 'idle' || id === 'disabled') {
+      patch.cycleRunning = false;
+      patch.workers = s.workers.map(w => Object.assign({}, w, { state: 'idle', currentItem: null, stuck: false }));
+      if (id === 'disabled') patch.schedulerEnabled = false;
+    }
+    if (id === 'fresh') { patch.cycleRunning = false; patch.workers = []; patch.crawl = null; patch.events = []; }
+    if (id === 'error') {
+      patch.workers = [
+        Object.assign(base('crawler', 'error', null, 42, 7, T0 - 120000, 'HTTP 503 на metacritic.com/browse/game/all/?page=3 — источник не ответил после трёх попыток'), { stuck: true }),
+        base('summarizer', 'running', 'резюме: Neon Vaults', 21, 0, T0 - 5000, null),
+        base('embedder', 'idle', null, 44, 0, T0 - 3600000, null)
+      ];
+    }
+    if (id === 'failing') {
+      patch.workers = [
+        base('crawler', 'running', 'Skyward Tactics', 18, 26, T0 - 4000, 'HTTP 500 на metacritic.com — страница игры не открылась'),
+        base('summarizer', 'idle', null, 12, 19, T0 - 600000, 'модель вернула пустой ответ'),
+        base('embedder', 'idle', null, 44, 0, T0 - 3600000, null)
+      ];
+    }
+    if (id === 'offline') { patch.connected = false; patch.reconnectIn = 5; }
+    this.setState(patch);
+  }
+
+  fireRun() {
+    const s = this.state;
+    if (!s.schedulerEnabled) { this.setState({ runResult: 503 }); return; }
+    if (s.cycleRunning) { this.setState({ runResult: 409 }); return; }
+    this.setState({ runResult: 202, cycleRunning: true, scenario: 'running', queue: null, step: 0 });
+  }
+
+  ago(ts, now) {
+    if (!ts) return 'ещё не работал';
+    const sec = Math.max(0, Math.round((now - ts) / 1000));
+    if (sec < 5) return 'только что';
+    if (sec < 60) return sec + ' с назад';
+    const min = Math.round(sec / 60);
+    if (min < 60) return min + (min % 10 === 1 && min !== 11 ? ' минуту назад' : ' мин назад');
+    const h = Math.round(min / 60);
+    return h + (h === 1 ? ' час назад' : ' ч назад');
+  }
+
+  clock(ts) {
+    const d = new Date(ts);
+    const p = n => (n < 10 ? '0' : '') + n;
+    return p(d.getUTCHours()) + ':' + p(d.getUTCMinutes()) + ':' + p(d.getUTCSeconds());
+  }
+
+  renderVals() {
+    const s = this.state;
+    const now = T0 + s.tick * 1300;
+    const running = s.cycleRunning && s.connected;
+    const stateMap = {
+      idle: { text: 'IDLE', bg: '#22232a', fg: '#9a9ba3', anim: 'none' },
+      running: { text: 'RUNNING', bg: 'rgba(60,150,180,0.14)', fg: ACCENT, anim: 'pulse 1.6s ease-in-out infinite' },
+      error: { text: 'ERROR', bg: 'rgba(180,60,40,0.14)', fg: 'oklch(0.75 0.16 25)', anim: 'none' }
+    };
+    const workers = s.workers.map(w => {
+      const st = stateMap[w.state] || stateMap.idle;
+      return {
+        worker: w.worker, stateText: st.text, pillBg: st.bg, pillFg: st.fg, anim: st.anim,
+        accent: w.state === 'error' ? BAD : (w.state === 'running' ? ACCENT : '#2c2c33'),
+        roleText: ROLE[w.worker] || '',
+        currentItem: w.currentItem || (w.state === 'error' ? 'остановлен на ошибке' : 'ничего не делает'),
+        itemColor: w.currentItem ? '#edeef0' : '#6f6f77',
+        processed: w.processedTotal, failed: w.failedTotal,
+        failColor: w.failedTotal === 0 ? '#6f6f77' : (w.failedTotal > w.processedTotal ? BAD : MIXED),
+        lastRunText: 'последний прогон: ' + this.ago(w.lastRunAt, now),
+        hasError: !!w.lastError, lastError: w.lastError || ''
+      };
+    });
+
+    const openIds = s.openIds;
+    const events = s.events.map(e => ({
+      time: this.clock(e.ts), worker: e.worker, message: e.message,
+      levelText: e.level.toUpperCase(),
+      levelBg: e.level === 'error' ? 'rgba(180,60,40,0.14)' : (e.level === 'warn' ? 'rgba(190,150,40,0.14)' : '#22232a'),
+      levelFg: e.level === 'error' ? 'oklch(0.75 0.16 25)' : (e.level === 'warn' ? MIXED : '#9a9ba3'),
+      hasData: !!e.data, open: openIds.indexOf(e.id) >= 0,
+      toggleText: openIds.indexOf(e.id) >= 0 ? 'скрыть data' : 'data',
+      dataText: e.data ? JSON.stringify(e.data, null, 2) : '',
+      toggle: () => this.setState(st => ({ openIds: st.openIds.indexOf(e.id) >= 0 ? st.openIds.filter(x => x !== e.id) : st.openIds.concat([e.id]) }))
+    }));
+
+    const btn = active => active
+      ? { bg: ACCENT, fg: '#0c0c0d', bc: ACCENT }
+      : { bg: '#202025', fg: '#a9aab1', bc: '#33333a' };
+    const vpOptions = [['desktop', '1280'], ['tablet', '834'], ['mobile', '390']].map(v =>
+      Object.assign({ label: v[1], pick: () => this.setState({ vp: v[0] }) }, btn(s.vp === v[0])));
+
+    const activeWorker = s.workers.find(w => w.state === 'running');
+    const results = {
+      202: { code: '202', text: 'Цикл запущен. Ответ пришёл сразу — прогресс смотрите по «чем занят» и счётчикам, это займёт минуты.', bg: 'rgba(60,150,180,0.09)', bc: 'oklch(0.45 0.08 205)', fg: ACCENT },
+      409: { code: '409', text: 'Цикл уже идёт — повторный запуск не нужен. Это не ошибка.', bg: '#16161a', bc: '#2c2c33', fg: '#a9aab1' },
+      503: { code: '503', text: 'Планировщик выключен в настройках сервиса. Запуск недоступен, пока его не включат на сервере.', bg: 'rgba(190,150,40,0.08)', bc: 'oklch(0.5 0.09 92)', fg: MIXED }
+    };
+    const runDisabled = !s.schedulerEnabled || s.cycleRunning || !s.connected;
+
+    return {
+      showBar: this.props.showSpecBar !== false,
+      url: '/monitoring   ·   SSE /api/events' + (s.connected ? '' : ' — обрыв'),
+      scenario: s.scenario, scenarios: this.scenarioList(),
+      setScenario: e => this.applyScenario(e.target.value),
+      vpOptions, vpWidth: { desktop: '1280px', tablet: '834px', mobile: '390px' }[s.vp],
+      workerCols: s.vp === 'desktop' ? 'repeat(3, minmax(0, 1fr))' : (s.vp === 'tablet' ? 'repeat(2, minmax(0, 1fr))' : '1fr'),
+      crawlCols: s.vp === 'mobile' ? 'repeat(2, minmax(0, 1fr))' : 'repeat(4, minmax(0, 1fr))',
+
+      conn: s.connected
+        ? { text: 'поток подключён · ' + this.clock(now), color: GOOD, anim: 'pulse 2.4s ease-in-out infinite' }
+        : { text: 'нет связи · переподключение через ' + s.reconnectIn + ' с', color: MIXED, anim: 'pulse 0.9s ease-in-out infinite' },
+      offline: !s.connected,
+      offlineText: 'Поток событий оборвался — возможно, сервис перезапускается. Пробуем подключиться заново, счётчики пока не обновляются.',
+
+      cycle: running
+        ? { title: 'Цикл идёт', note: activeWorker ? 'сейчас работает ' + activeWorker.worker + ' · снимок состояния приходит на каждую запись' : 'ждём первый снимок', color: ACCENT, anim: 'pulse 1.6s ease-in-out infinite' }
+        : (s.schedulerEnabled
+          ? { title: 'Простой', note: 'следующий автоматический цикл в начале часа', color: '#6f6f77', anim: 'none' }
+          : { title: 'Планировщик выключен', note: 'автоматических циклов нет · schedulerEnabled: false', color: MIXED, anim: 'none' }),
+
+      run: () => this.fireRun(),
+      runDisabled,
+      runLabel: s.cycleRunning ? 'Цикл уже идёт' : 'Запустить сейчас',
+      runCursor: runDisabled ? 'not-allowed' : 'pointer',
+      runBg: runDisabled ? '#1a1a1e' : ACCENT,
+      runFg: runDisabled ? '#6f6f77' : '#0c0c0d',
+      runBc: runDisabled ? '#2c2c33' : ACCENT,
+      runResult: s.runResult ? Object.assign({ show: true }, results[s.runResult]) : { show: false },
+
+      fresh: s.workers.length === 0,
+      hasWorkers: s.workers.length > 0,
+      workers,
+      hasCrawl: !!s.crawl, noCrawl: !s.crawl,
+      crawlFacts: s.crawl ? [
+        { k: 'ДАТА СБОРА', v: s.crawl.date, note: 'календарная дата UTC' },
+        { k: 'ФАЗА', v: s.crawl.phase, note: s.crawl.phase === 'landing' ? 'первые 20 игр с главной' : 'очередная страница общего списка' },
+        { k: 'СЛЕДУЮЩАЯ СТРАНИЦА', v: s.crawl.nextPage, note: 'не чаще одного запроса в секунду' },
+        { k: 'ОБРАБОТАНО ЗА ДЕНЬ', v: s.crawl.processedToday, note: 'растёт на каждой игре' }
+      ] : [],
+      hasEvents: s.events.length > 0 && !s.quiet,
+      quietJournal: s.quiet || (s.events.length === 0 && s.workers.length > 0),
+      events,
+      journalNote: s.quiet ? 'за последние 6 минут записей нет' : 'свежие сверху · хранится до 5000 записей'
+    };
+  }
+}
+</script>
+</body>
+</html>

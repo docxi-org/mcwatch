@@ -1,0 +1,82 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Sora:wght@400;600;700;800&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+<style>
+  html, body { margin: 0; padding: 0; background: #0c0c0d; }
+  body { font-family: 'Sora', system-ui, sans-serif; -webkit-font-smoothing: antialiased; }
+  a { color: oklch(0.78 0.13 205); text-decoration: none; }
+  a:hover { color: oklch(0.88 0.10 205); }
+  ::selection { background: oklch(0.78 0.13 205); color: #0c0c0d; }
+  :focus-visible { outline: 2px solid oklch(0.78 0.13 205); outline-offset: 3px; border-radius: 4px; }
+</style>
+</helmet>
+
+<div style="min-height: 100vh; background: #0c0c0d; color: #edeef0; padding: 0 16px 90px">
+  <div style="max-width: 860px; margin: 0 auto">
+
+    <header style="display: flex; flex-direction: column; gap: 16px; padding: 56px 0 30px; border-bottom: 1px solid #1e1e22">
+      <span style="font-size: 32px; font-weight: 800; letter-spacing: -0.03em; color: #f4f5f7">mcwatch<span style="color: oklch(0.78 0.13 205)">.</span></span>
+      <p style="margin: 0; max-width: 60ch; font-size: 15.5px; line-height: 1.65; color: #a9aab1; text-wrap: pretty">Макеты по двум брифам: каталог новых игр с Metacritic и служебный экран мониторинга. Кликабельные, с переключателем состояний и трёх ширин: 1280, 834, 390. Данные вымышленные, пропорции пустых полей — по замерам из брифа.</p>
+    </header>
+
+    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 14px; padding: 30px 0 0">
+      <sc-for list="{{ cards }}" as="c" hint-placeholder-count="3">
+        <a href="{{ c.href }}" style="display: flex; flex-direction: column; gap: 12px; padding: 20px; background: #141417; border: 1px solid #232328; border-radius: 12px; border-top: 2px solid {{ c.accent }}" style-hover="border-color: #3d3d45">
+          <span style="font-family: 'JetBrains Mono', monospace; font-size: 9.5px; letter-spacing: 0.07em; color: #74747c">{{ c.kicker }}</span>
+          <span style="font-size: 19px; font-weight: 700; letter-spacing: -0.02em; color: #f2f3f5">{{ c.title }}</span>
+          <span style="font-size: 13.5px; line-height: 1.55; color: #a9aab1; text-wrap: pretty">{{ c.note }}</span>
+          <span style="font-family: 'JetBrains Mono', monospace; font-size: 10.5px; color: oklch(0.78 0.13 205); margin-top: auto">{{ c.link }} →</span>
+        </a>
+      </sc-for>
+    </div>
+
+    <section style="display: flex; flex-direction: column; gap: 12px; padding: 44px 0 0">
+      <h2 style="margin: 0; font-size: 17px; font-weight: 600; letter-spacing: -0.01em">Что покрыто</h2>
+      <div style="display: flex; flex-direction: column; gap: 1px; border: 1px solid #232328; border-radius: 10px; overflow: hidden">
+        <sc-for list="{{ rows }}" as="r" hint-placeholder-count="6">
+          <div style="display: flex; gap: 14px; flex-wrap: wrap; padding: 12px 15px; background: #141417">
+            <span style="flex: none; width: 170px; font-family: 'JetBrains Mono', monospace; font-size: 11px; color: #79a9b8">{{ r.k }}</span>
+            <span style="flex: 1 1 240px; min-width: 0; font-size: 13px; color: #c8c9cf; line-height: 1.55">{{ r.v }}</span>
+          </div>
+        </sc-for>
+      </div>
+      <p style="margin: 0; font-size: 13px; color: #6f6f77; line-height: 1.6">Служебная панель сверху макетов — инструмент разбора, в продакшене её нет.</p>
+    </section>
+
+  </div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script>
+class Component extends DCLogic {
+  renderVals() {
+    return {
+      cards: [
+        { href: 'mcwatch.dc.html', kicker: 'БРИФ 1 · ДЛЯ ПОСЕТИТЕЛЯ', title: 'Каталог', note: 'Список игр с поиском, фильтром по платформе, четырьмя сортировками и бесконечной подгрузкой; карточка игры с таблицей платформ, двумя резюме и похожими.', link: 'mcwatch', accent: 'oklch(0.78 0.13 205)' },
+        { href: 'Мониторинг.dc.html', kicker: 'БРИФ 2 · ДЛЯ ВЛАДЕЛЬЦА', title: 'Мониторинг', note: 'Три воркера, состояние обхода, журнал событий и кнопка принудительного запуска. Поток состояния симулируется, экран видно живым.', link: 'monitoring', accent: 'oklch(0.72 0.19 145)' },
+        { href: 'Спека.dc.html', kicker: 'ДЛЯ РАЗРАБОТЧИКА', title: 'Спека', note: 'Цвет, шрифты, правила двух шкал, таблица неполных данных, обложки, адрес списка, мониторинг, доступность, ошибки и три ширины.', link: 'спека', accent: 'oklch(0.82 0.16 92)' }
+      ],
+      rows: [
+        { k: 'экраны', v: 'Список игр, карточка игры, мониторинг' },
+        { k: 'состояния', v: '16 в каталоге и 10 в мониторинге — все из разделов «что обязательно случится» обоих брифов' },
+        { k: 'ширины', v: '1280 / 834 / 390, переключаются в служебной панели' },
+        { k: 'две шкалы', v: 'Метаскор 0–100 и оценка игроков 0–10 подаются по-разному и не смешиваются' },
+        { k: 'ошибки', v: '404, 500 в каталоге; 202, 409, 503 на кнопке запуска цикла' },
+        { k: 'реальное время', v: 'Снимок состояния приходит на каждую запись; журнал редок и это объяснено на экране' }
+      ]
+    };
+  }
+}
+</script>
+</body>
+</html>
