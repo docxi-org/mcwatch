@@ -87,6 +87,38 @@ describe('состояние воркеров', () => {
     expect(again.statuses()[0]?.processedTotal).toBe(7);
   });
 
+  it('«проверено» растёт отдельно от «обработано»', () => {
+    // Воркер рассмотрел пять единиц, работа нашлась в одной. Без отдельного
+    // счётчика честный простой выглядел бы поломкой.
+    monitor.checked('summarizer', 5);
+    monitor.processed('summarizer');
+
+    expect(monitor.statuses()[0]).toMatchObject({
+      checkedTotal: 5,
+      processedTotal: 1,
+      failedTotal: 0,
+    });
+  });
+
+  it('«проверено» без единого результата — это ноль обработанных, а не ноль работы', () => {
+    monitor.checked('summarizer', 33);
+
+    expect(monitor.statuses()[0]).toMatchObject({ checkedTotal: 33, processedTotal: 0 });
+  });
+
+  it('три счётчика не затирают друг друга', () => {
+    monitor.checked('crawler', 4);
+    monitor.processed('crawler', 3);
+    monitor.failed('crawler');
+    monitor.checked('crawler');
+
+    expect(monitor.statuses()[0]).toMatchObject({
+      checkedTotal: 5,
+      processedTotal: 3,
+      failedTotal: 1,
+    });
+  });
+
   it('воркеры считаются раздельно', () => {
     monitor.processed('crawler', 2);
     monitor.processed('summarizer', 5);

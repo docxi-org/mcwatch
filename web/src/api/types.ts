@@ -22,6 +22,8 @@ export interface WorkerStatusDto {
   worker: string;
   state: 'idle' | 'running' | 'error';
   currentItem: string | null;
+  /** Рассмотрено единиц. Всегда ≥ `processedTotal`. */
+  checkedTotal: number;
   processedTotal: number;
   failedTotal: number;
   lastRunAt: string | null;
@@ -44,11 +46,21 @@ export interface EventDto {
   data: unknown;
 }
 
+/** Раскладка летсплеев по исходам: куда делись рассмотренные игры. */
+export interface LetsplayOutcomesDto {
+  done: number;
+  noVideo: number;
+  noTranscript: number;
+  failed: number;
+  pending: number;
+}
+
 export interface StatusDto {
   workers: WorkerStatusDto[];
   crawl: CrawlStateDto | null;
   cycleRunning: boolean;
   schedulerEnabled: boolean;
+  letsplayOutcomes: LetsplayOutcomesDto;
   events: EventDto[];
   serverTime: string;
 }

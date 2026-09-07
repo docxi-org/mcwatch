@@ -27,6 +27,8 @@ export interface WorkerStatusDto {
   worker: string;
   state: WorkerState;
   currentItem: string | null;
+  /** Рассмотрено единиц. Всегда ≥ `processedTotal`. */
+  checkedTotal: number;
   processedTotal: number;
   failedTotal: number;
   lastRunAt: string | null;
@@ -50,6 +52,8 @@ export type MonitorListener = (message: MonitorMessage) => void;
 export interface Reporter {
   started: (worker: string) => void;
   item: (worker: string, name: string) => void;
+  /** Единица рассмотрена — независимо от того, вышел из неё результат. */
+  checked: (worker: string, n?: number) => void;
   processed: (worker: string, n?: number) => void;
   failed: (worker: string, n?: number) => void;
   finished: (worker: string, error?: string | null) => void;
@@ -60,6 +64,7 @@ export interface Reporter {
 export const nullReporter: Reporter = {
   started: () => undefined,
   item: () => undefined,
+  checked: () => undefined,
   processed: () => undefined,
   failed: () => undefined,
   finished: () => undefined,
@@ -86,6 +91,11 @@ export class Monitor implements Reporter {
   item(worker: string, name: string): void {
     this.upsert(worker, { currentItem: name });
     // Обход длится минуты, и без этого поток молчал бы всё это время.
+    this.broadcastStatus();
+  }
+
+  checked(worker: string, n = 1): void {
+    this.bump(worker, 'checked', n);
     this.broadcastStatus();
   }
 
@@ -167,6 +177,7 @@ export class Monitor implements Reporter {
         worker: r.worker,
         state: r.state,
         currentItem: r.currentItem,
+        checkedTotal: r.checkedTotal,
         processedTotal: r.processedTotal,
         failedTotal: r.failedTotal,
         lastRunAt: r.lastRunAt?.toISOString() ?? null,
@@ -214,20 +225,25 @@ export class Monitor implements Reporter {
    * Счётчики накопительные: их растят прибавкой, а не перезаписью, — иначе
    * «обработано за всё время» превратилось бы в «за последний вызов».
    */
-  private bump(worker: string, which: 'processed' | 'failed', n: number): void {
-    const isProcessed = which === 'processed';
+  private bump(worker: string, which: 'checked' | 'processed' | 'failed', n: number): void {
+    const column = {
+      checked: workerStatus.checkedTotal,
+      processed: workerStatus.processedTotal,
+      failed: workerStatus.failedTotal,
+    }[which];
+
     this.db
       .insert(workerStatus)
       .values({
         worker,
-        processedTotal: isProcessed ? n : 0,
-        failedTotal: isProcessed ? 0 : n,
+        checkedTotal: which === 'checked' ? n : 0,
+        processedTotal: which === 'processed' ? n : 0,
+        failedTotal: which === 'failed' ? n : 0,
       })
       .onConflictDoUpdate({
         target: workerStatus.worker,
-        set: isProcessed
-          ? { processedTotal: sql`${workerStatus.processedTotal} + ${n}` }
-          : { failedTotal: sql`${workerStatus.failedTotal} + ${n}` },
+        // Ссылки на колонки, а не имена: имена Drizzle в `set` не понимает.
+        set: { [which === 'checked' ? 'checkedTotal' : which === 'processed' ? 'processedTotal' : 'failedTotal']: sql`${column} + ${n}` },
       })
       .run();
   }

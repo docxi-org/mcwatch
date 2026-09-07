@@ -179,6 +179,12 @@ export const workerStatus = sqliteTable('worker_status', {
   worker: text('worker').primaryKey(),
   state: text('state', { enum: workerState }).notNull().default('idle'),
   currentItem: text('current_item'),
+  /**
+   * Сколько единиц воркер РАССМОТРЕЛ. Всегда ≥ `processedTotal`: честный
+   * простой («проверил 33 пары, обновлять нечего») иначе неотличим от
+   * поломки — на этом споткнулся владелец 07.09.2026.
+   */
+  checkedTotal: integer('checked_total').notNull().default(0),
   processedTotal: integer('processed_total').notNull().default(0),
   failedTotal: integer('failed_total').notNull().default(0),
   lastRunAt: integer('last_run_at', { mode: 'timestamp_ms' }),

@@ -16,6 +16,7 @@ import {
   selectForSummary,
   SUMMARY_INPUT_LIMIT,
 } from '../src/workers/selectReviews.js';
+import { Monitor } from '../src/workers/monitor.js';
 import { runSummarizeOnce } from '../src/workers/summarizer.js';
 
 const log = pino({ level: 'silent' });
@@ -191,6 +192,33 @@ describe('воркер резюме', () => {
 
     expect(second.calls).toEqual([]);
     expect(result).toMatchObject({ written: 0, upToDate: 1 });
+  });
+
+  it('прогон без работы всё равно докладывает, что рассмотрел', async () => {
+    // Владелец спросил «почему summarizer обработал 0» — потому что счётчик
+    // считал результат и молчал о работе. Теперь молчания нет.
+    seed('a', { critic: 4, user: 3 });
+    const deps = { db: handle.db, now: at('2026-09-10T00:00:00Z'), log };
+    await runSummarizeOnce({ ...deps, client: fakeLlm().client });
+
+    const monitor = new Monitor(handle.db);
+    const checked = vi.spyOn(monitor, 'checked');
+    const processed = vi.spyOn(monitor, 'processed');
+
+    const result = await runSummarizeOnce({
+      ...deps,
+      client: fakeLlm().client,
+      reporter: monitor,
+    });
+
+    expect(result).toMatchObject({ written: 0, upToDate: 2 });
+    expect(checked).toHaveBeenCalledTimes(2);
+    expect(processed).not.toHaveBeenCalled();
+    expect(monitor.statuses()[0]).toMatchObject({
+      worker: 'summarizer',
+      checkedTotal: 2,
+      processedTotal: 0,
+    });
   });
 
   it('после прироста отзывов пересчитывает и запоминает новое число', async () => {

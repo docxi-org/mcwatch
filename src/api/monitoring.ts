@@ -5,6 +5,7 @@ import { crawlState } from '../db/schema.js';
 import type { Monitor } from '../workers/monitor.js';
 import type { Scheduler } from '../workers/scheduler.js';
 import { utcDate } from '../db/repo/crawlState.js';
+import { letsplayOutcomes } from '../db/repo/letsplays.js';
 import { desc } from 'drizzle-orm';
 
 /**
@@ -49,6 +50,9 @@ export function createMonitoringRoutes(deps: MonitoringDeps): Hono {
         : null,
       cycleRunning: deps.scheduler?.isRunning ?? false,
       schedulerEnabled: Boolean(deps.scheduler),
+      // Счётчик воркера считает только заключения; раскладка объясняет, куда
+      // делись остальные рассмотренные игры.
+      letsplayOutcomes: letsplayOutcomes(deps.db),
       events: deps.monitor.recentEvents(50),
       serverTime: now().toISOString(),
     });

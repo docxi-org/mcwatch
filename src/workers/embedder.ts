@@ -73,6 +73,7 @@ export async function runEmbedOnce(deps: EmbedDeps): Promise<EmbedResult> {
 
   for (const batch of chunk(pending, size)) {
     const slugs = batch.map((g) => g.slug);
+    report.checked(WORKER, batch.length);
     report.item(WORKER, `пачка из ${batch.length}`);
     try {
       const vectors = await client.embed(batch.map(embeddingTextOf));
@@ -99,10 +100,13 @@ export async function runEmbedOnce(deps: EmbedDeps): Promise<EmbedResult> {
     { written: result.written, failed: result.failed },
     'прогон эмбеддингов завершён',
   );
-  report.log(WORKER, 'info', 'прогон завершён', {
-    written: result.written,
-    failed: result.failed,
-  });
+  report.log(
+    WORKER,
+    'info',
+    `прогон завершён · векторов посчитано: ${result.written}` +
+      (result.failed > 0 ? ` · сбоев: ${result.failed}` : ''),
+    { written: result.written, failed: result.failed },
+  );
   report.finished(WORKER);
   return result;
 }

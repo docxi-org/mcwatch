@@ -227,6 +227,7 @@ export async function runCrawlOnce(deps: CrawlDeps): Promise<CrawlResult> {
   const touched: string[] = [];
 
   for (const item of todo) {
+    report.checked(WORKER);
     report.item(WORKER, item.title);
     try {
       const card = await client.getGameCard(item.slug);
@@ -269,11 +270,23 @@ export async function runCrawlOnce(deps: CrawlDeps): Promise<CrawlResult> {
     },
     'заход сбора завершён',
   );
-  report.log(WORKER, 'info', 'заход завершён', {
-    saved: result.saved,
-    failed: result.failed,
-    reviews: result.reviewsWritten,
-  });
+  // Итог читается строкой, без разворачивания `data`: молчаливый ноль
+  // неотличим от поломки (решение владельца 07.09.2026).
+  report.log(
+    WORKER,
+    'info',
+    `заход завершён · в списке: ${result.listed} · сохранено: ${result.saved} · ` +
+      `уже обрабатывали сегодня: ${result.alreadyProcessedToday} · ` +
+      `отзывов: ${result.reviewsWritten.critic + result.reviewsWritten.user}` +
+      (result.failed > 0 ? ` · сбоев: ${result.failed}` : ''),
+    {
+      listed: result.listed,
+      saved: result.saved,
+      alreadyProcessedToday: result.alreadyProcessedToday,
+      failed: result.failed,
+      reviews: result.reviewsWritten,
+    },
+  );
   report.finished(WORKER);
   return result;
 }

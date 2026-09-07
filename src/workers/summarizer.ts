@@ -129,6 +129,9 @@ export async function runSummarizeOnce(
   for (const c of candidates) {
     if (deps.limit !== undefined && result.written >= deps.limit) break;
 
+    // Рассмотрели пару — и это уже работа, даже если обновлять нечего.
+    report.checked(WORKER);
+
     const existing = getSummary(db, c.slug, c.kind);
     const reason: RefreshReason = refreshReason(existing, c.reviewCount, now());
 
@@ -175,11 +178,20 @@ export async function runSummarizeOnce(
     { written: result.written, upToDate: result.upToDate, failed: result.failed },
     'прогон резюме завершён',
   );
-  report.log(WORKER, 'info', 'прогон завершён', {
-    written: result.written,
-    upToDate: result.upToDate,
-    failed: result.failed,
-  });
+  report.log(
+    WORKER,
+    'info',
+    // Числа стоят после двоеточия: так подпись не приходится склонять.
+    `прогон завершён · проверено пар «игра + вид отзывов»: ${candidates.length} · ` +
+      `резюме обновлено: ${result.written} · свежих: ${result.upToDate}` +
+      (result.failed > 0 ? ` · сбоев: ${result.failed}` : ''),
+    {
+      checked: candidates.length,
+      written: result.written,
+      upToDate: result.upToDate,
+      failed: result.failed,
+    },
+  );
   report.finished(WORKER);
   return result;
 }

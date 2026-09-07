@@ -336,3 +336,70 @@ describe('клиент YouTube', () => {
     );
   });
 });
+
+describe('раскладка исходов', () => {
+  it('считает каждый исход и игры, до которых воркер не дошёл', async () => {
+    const { letsplayOutcomes } = await import('../src/db/repo/letsplays.js');
+
+    seedGame('готова');
+    seedGame('чужие-ролики');
+    seedGame('без-речи');
+    seedGame('не-трогали');
+
+    await runLetsplayOnce({
+      db: handle.db,
+      ...fakes({
+        candidates: [video('v1')],
+        transcripts: { v1: 'речь' },
+      }),
+      now: at('2026-09-10T00:00:00Z'),
+      log,
+    });
+
+    const out = letsplayOutcomes(handle.db);
+    // Три игры получили ролик, четвёртая тоже — фейк отдаёт всем одно и то же;
+    // важно, что сумма исходов покрывает всю базу без остатка.
+    expect(out.done + out.noVideo + out.noTranscript + out.failed + out.pending).toBe(4);
+  });
+
+  it('игры без записи попадают в «ещё не искали», а не теряются', async () => {
+    const { letsplayOutcomes } = await import('../src/db/repo/letsplays.js');
+
+    seedGame('одна');
+    seedGame('вторая');
+
+    expect(letsplayOutcomes(handle.db)).toMatchObject({
+      done: 0,
+      noVideo: 0,
+      noTranscript: 0,
+      failed: 0,
+      pending: 2,
+    });
+  });
+
+  it('исходы различаются: «ролика нет» и «в ролике молчат» — разные строки', async () => {
+    const { letsplayOutcomes } = await import('../src/db/repo/letsplays.js');
+
+    seedGame('нет-ролика');
+    await runLetsplayOnce({
+      db: handle.db,
+      ...fakes({ candidates: [] }),
+      now: at('2026-09-10T00:00:00Z'),
+      log,
+    });
+
+    seedGame('молчит');
+    await runLetsplayOnce({
+      db: handle.db,
+      ...fakes({ candidates: [video('v1')], transcripts: {} }),
+      now: at('2026-09-10T00:00:00Z'),
+      log,
+    });
+
+    expect(letsplayOutcomes(handle.db)).toMatchObject({
+      noVideo: 1,
+      noTranscript: 1,
+      pending: 0,
+    });
+  });
+});

@@ -91,3 +91,43 @@ export function letsplayStats(db: Db): Record<string, number> {
   }
   return out;
 }
+
+/** Раскладка по исходам. `pending` — игры, до которых воркер ещё не дошёл. */
+export interface LetsplayOutcomes {
+  done: number;
+  noVideo: number;
+  noTranscript: number;
+  failed: number;
+  pending: number;
+}
+
+/**
+ * Сколько игр каким исходом закончились. Счётчик воркера считает только
+ * заключения, поэтому без этой раскладки «обработано 6» при полусотне
+ * рассмотренных игр выглядит поломкой (решение владельца 07.09.2026).
+ */
+export function letsplayOutcomes(db: Db): LetsplayOutcomes {
+  const rows = db
+    .select({ status: letsplays.status, n: sql<number>`count(*)` })
+    .from(letsplays)
+    .groupBy(letsplays.status)
+    .all();
+
+  const by = (status: LetsplayStatus): number =>
+    rows.find((r) => r.status === status)?.n ?? 0;
+
+  const untouched = db
+    .select({ n: sql<number>`count(*)` })
+    .from(games)
+    .where(sql`not exists (select 1 from ${letsplays} where ${letsplays.gameSlug} = ${games.slug})`)
+    .get();
+
+  return {
+    done: by('done'),
+    noVideo: by('no_video'),
+    noTranscript: by('no_transcript'),
+    failed: by('failed'),
+    // «Ещё не искали» — это и строка со статусом pending, и её отсутствие.
+    pending: by('pending') + (untouched?.n ?? 0),
+  };
+}

@@ -1,0 +1,1 @@
+ALTER TABLE `worker_status` ADD `checked_total` integer DEFAULT 0 NOT NULL;

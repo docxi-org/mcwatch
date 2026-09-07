@@ -131,6 +131,7 @@ export async function runLetsplayOnce(deps: LetsplayDeps): Promise<LetsplayResul
   log.info({ pending: pending.length }, 'прогон летсплеев начат');
 
   for (const game of pending) {
+    report.checked(WORKER);
     report.item(WORKER, game.title);
     const rejected: RejectedCandidate[] = [];
 
@@ -208,12 +209,20 @@ export async function runLetsplayOnce(deps: LetsplayDeps): Promise<LetsplayResul
     { done: result.done, noVideo: result.noVideo, noTranscript: result.noTranscript, failed: result.failed },
     'прогон летсплеев завершён',
   );
-  report.log(WORKER, 'info', 'прогон завершён', {
-    done: result.done,
-    noVideo: result.noVideo,
-    noTranscript: result.noTranscript,
-    failed: result.failed,
-  });
+  report.log(
+    WORKER,
+    'info',
+    `прогон завершён · рассмотрено игр: ${result.pending} · заключений: ${result.done} · ` +
+      `без подходящего ролика: ${result.noVideo} · без речи: ${result.noTranscript}` +
+      (result.failed > 0 ? ` · сбоев: ${result.failed}` : ''),
+    {
+      pending: result.pending,
+      done: result.done,
+      noVideo: result.noVideo,
+      noTranscript: result.noTranscript,
+      failed: result.failed,
+    },
+  );
   report.finished(WORKER);
   return result;
 }

@@ -1,7 +1,12 @@
 <script setup lang="ts">
 import { computed, onBeforeUnmount, onMounted, ref } from 'vue';
 import { fetchStatus, runCrawl, type RunOutcome } from '../api/client.js';
-import type { CrawlStateDto, EventDto, WorkerStatusDto } from '../api/types.js';
+import type {
+  CrawlStateDto,
+  EventDto,
+  LetsplayOutcomesDto,
+  WorkerStatusDto,
+} from '../api/types.js';
 import { useEventStream } from '../lib/eventStream.js';
 import { agoText, clockText } from '../lib/format.js';
 
@@ -58,6 +63,7 @@ const RUN_RESULT: Record<Exclude<RunOutcome, never>, { code: string; text: strin
 
 const workers = ref<WorkerStatusDto[]>([]);
 const crawl = ref<CrawlStateDto | null>(null);
+const outcomes = ref<LetsplayOutcomesDto | null>(null);
 const events = ref<EventDto[]>([]);
 const cycleRunning = ref(false);
 const schedulerEnabled = ref(true);
@@ -83,6 +89,7 @@ async function loadStatus(): Promise<void> {
     const snapshot = await fetchStatus();
     workers.value = snapshot.workers;
     crawl.value = snapshot.crawl;
+    outcomes.value = snapshot.letsplayOutcomes;
     events.value = snapshot.events;
     cycleRunning.value = snapshot.cycleRunning;
     schedulerEnabled.value = snapshot.schedulerEnabled;
@@ -184,6 +191,19 @@ const runLabel = computed(() => (cycleRunning.value ? 'Цикл уже идёт'
 
 const outcome = computed(() => (runOutcome.value ? RUN_RESULT[runOutcome.value] : null));
 
+/** Исходы летсплеев по всей базе, свежие сверху по смыслу, а не по числу. */
+const letsplayBreakdown = computed(() => {
+  const o = outcomes.value;
+  if (!o) return [];
+  return [
+    { label: 'заключение сделано', n: o.done },
+    { label: 'подходящего ролика нет', n: o.noVideo },
+    { label: 'ролики есть, но в них молчат', n: o.noTranscript },
+    { label: 'сорвалось, повторим', n: o.failed },
+    { label: 'ещё не искали', n: o.pending },
+  ];
+});
+
 /** Пустой журнал при живом цикле — обычное дело, и это надо объяснить. */
 const quietJournal = computed(() => loaded.value && events.value.length === 0);
 </script>
@@ -276,6 +296,15 @@ const quietJournal = computed(() => loaded.value && events.value.length === 0);
             </div>
 
             <div class="worker__counters">
+              <!--
+                «Проверено» стоит первым не случайно: воркер, рассмотревший
+                тридцать пар и честно не нашедший работы, без него выглядел
+                сломанным.
+              -->
+              <span class="counter">
+                <span class="counter__value counter__value--dim mono">{{ w.checkedTotal }}</span>
+                <span class="counter__label mono">ПРОВЕРЕНО</span>
+              </span>
               <span class="counter">
                 <span class="counter__value mono">{{ w.processedTotal }}</span>
                 <span class="counter__label mono">ОБРАБОТАНО</span>
@@ -290,6 +319,20 @@ const quietJournal = computed(() => loaded.value && events.value.length === 0);
                   >{{ w.failedTotal }}</span
                 >
                 <span class="counter__label mono">ОШИБОК</span>
+              </span>
+            </div>
+
+            <!-- Летсплеи: счётчик считает только заключения, поэтому куда
+                 делись остальные игры, объясняет раскладка по исходам. -->
+            <div v-if="w.worker === 'letsplay' && outcomes" class="outcomes">
+              <span
+                v-for="o in letsplayBreakdown"
+                :key="o.label"
+                class="outcomes__row"
+                :class="{ 'outcomes__row--zero': o.n === 0 }"
+              >
+                <span class="outcomes__n mono">{{ o.n }}</span>
+                <span class="outcomes__label">{{ o.label }}</span>
               </span>
             </div>
 
@@ -729,6 +772,11 @@ const quietJournal = computed(() => loaded.value && events.value.length === 0);
   color: var(--text);
 }
 
+/* Проверено — фон работы, а не её результат: тише основного числа. */
+.counter__value--dim {
+  color: var(--text-3) !important;
+}
+
 .counter__value--warn {
   color: var(--mixed);
 }
@@ -741,6 +789,41 @@ const quietJournal = computed(() => loaded.value && events.value.length === 0);
   font-size: 9px;
   letter-spacing: 0.05em;
   color: var(--muted-2);
+}
+
+.outcomes {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  padding: 10px 12px;
+  background: var(--surface-3);
+  border-radius: 8px;
+}
+
+.outcomes__row {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  font-size: 12px;
+  color: var(--text-3);
+  line-height: 1.35;
+}
+
+.outcomes__row--zero {
+  color: var(--muted-3);
+}
+
+.outcomes__n {
+  flex: none;
+  min-width: 22px;
+  text-align: right;
+  font-weight: 700;
+  color: var(--text);
+}
+
+.outcomes__row--zero .outcomes__n {
+  font-weight: 400;
+  color: var(--muted-3);
 }
 
 .worker__last {
