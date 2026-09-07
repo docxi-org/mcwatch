@@ -1,0 +1,96 @@
+name: Деплой
+
+on:
+  push:
+    branches: [main]
+    # Правки документов сервис не меняют — деплой ради них не нужен.
+    paths-ignore:
+      - '**/*.md'
+      - 'docs/**'
+      - 'ui/**'
+  workflow_dispatch:
+
+concurrency:
+  # Два деплоя разом на один сервер недопустимы.
+  group: deploy-production
+  cancel-in-progress: false
+
+env:
+  REMOTE_DIR: /opt/mcwatch
+  HEALTH_URL: https://mcwatch.docxi.org/api/health
+
+jobs:
+  deploy:
+    name: Сборка и выкладка
+    runs-on: ubuntu-latest
+    environment: production
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 9
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      # Гейт до выкладки: на сервер не должно уезжать то, что не проходит проверку.
+      - name: Проверка
+        run: |
+          pnpm install --frozen-lockfile
+          pnpm check
+
+      - name: Сборка образа
+        run: docker build -t mcwatch:latest .
+
+      # Образ переносится напрямую, без реестра: серверу тогда не нужен ни
+      # доступ к ghcr, ни хранение учётных данных.
+      - name: Упаковать образ
+        run: docker save mcwatch:latest | gzip -9 > mcwatch.tar.gz
+
+      - name: Ключ SSH
+        run: |
+          install -m 700 -d ~/.ssh
+          echo "${{ secrets.SSH_PRIVATE_KEY }}" > ~/.ssh/id_ed25519
+          chmod 600 ~/.ssh/id_ed25519
+          ssh-keyscan -H "${{ vars.SSH_HOST }}" >> ~/.ssh/known_hosts 2>/dev/null
+
+      - name: Перенести образ и конфигурацию
+        run: |
+          SSH="ssh -i ~/.ssh/id_ed25519 ${{ vars.SSH_USER }}@${{ vars.SSH_HOST }}"
+          $SSH "mkdir -p ${{ env.REMOTE_DIR }}"
+          scp -i ~/.ssh/id_ed25519 mcwatch.tar.gz docker-compose.prod.yml \
+            ${{ vars.SSH_USER }}@${{ vars.SSH_HOST }}:${{ env.REMOTE_DIR }}/
+
+      - name: Запустить
+        run: |
+          ssh -i ~/.ssh/id_ed25519 ${{ vars.SSH_USER }}@${{ vars.SSH_HOST }} bash -s <<'REMOTE'
+          set -euo pipefail
+          cd /opt/mcwatch
+
+          # .env лежит только на сервере: ключей в репозитории нет.
+          test -f .env || { echo "нет /opt/mcwatch/.env с OPENROUTER_API_KEY"; exit 1; }
+
+          gunzip -c mcwatch.tar.gz | docker load
+          rm -f mcwatch.tar.gz
+
+          docker compose -f docker-compose.prod.yml up -d --remove-orphans
+          # Место на сервере ограничено: старые слои копятся быстро.
+          docker image prune -f
+          REMOTE
+
+      - name: Дождаться готовности
+        run: |
+          for i in $(seq 1 30); do
+            if curl -fsS --max-time 5 "${{ env.HEALTH_URL }}" > /tmp/h.json; then
+              echo "сервис отвечает: $(cat /tmp/h.json)"
+              exit 0
+            fi
+            sleep 5
+          done
+          echo "сервис не ответил за 150 секунд"
+          ssh -i ~/.ssh/id_ed25519 ${{ vars.SSH_USER }}@${{ vars.SSH_HOST }} \
+            'docker logs --tail 50 mcwatch' || true
+          exit 1

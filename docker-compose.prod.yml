@@ -1,0 +1,29 @@
+# Боевой compose для VPS, где 80/443 уже занимает Nginx с другими сайтами.
+# Caddy здесь не поднимается: HTTPS выдаёт системный Nginx + certbot, как у
+# остальных сайтов сервера. Контейнер слушает только localhost.
+#
+# Локальная проверка всего стека с Caddy — в docker-compose.yml.
+
+services:
+  app:
+    build: .
+    image: mcwatch:latest
+    container_name: mcwatch
+    restart: unless-stopped
+    environment:
+      NODE_ENV: production
+      PORT: 3000
+      LOG_LEVEL: ${LOG_LEVEL:-info}
+      DATABASE_PATH: /app/data/mcwatch.db
+      OPENROUTER_API_KEY: ${OPENROUTER_API_KEY:?нужен ключ OpenRouter}
+      CONTACT_EMAIL: ${CONTACT_EMAIL:-mcwatch@example.com}
+      SCHEDULER_ENABLED: ${SCHEDULER_ENABLED:-true}
+      SCHEDULER_INTERVAL_MIN: ${SCHEDULER_INTERVAL_MIN:-60}
+    volumes:
+      - db:/app/data
+    # Только петля: наружу пускает Nginx, а не Docker.
+    ports:
+      - "127.0.0.1:${HOST_PORT:-3021}:3000"
+
+volumes:
+  db:
