@@ -131,6 +131,23 @@ describe('сводки оценок', () => {
       reviewCount: 18,
     });
   });
+
+  it('ноль голосов даёт null, а не оценку 0 из 10', () => {
+    // Источник в этом случае шлёт score: 0 — сохранять его нельзя (§6).
+    const raw = { data: { item: { score: 0, max: 10, reviewCount: 0 } } };
+
+    expect(parseScoreStats(raw, 'user')).toEqual({
+      score: null,
+      max: 10,
+      reviewCount: 0,
+    });
+  });
+
+  it('честная нулевая оценка при наличии голосов сохраняется', () => {
+    const raw = { data: { item: { score: 0, max: 10, reviewCount: 7 } } };
+
+    expect(parseScoreStats(raw, 'user').score).toBe(0);
+  });
 });
 
 describe('отзывы', () => {

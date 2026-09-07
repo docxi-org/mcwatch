@@ -211,11 +211,18 @@ export function parseScoreStats(raw: unknown, kind: ReviewKind): ScoreStats {
   const parsed = statsSchema.safeParse(raw);
   if (!parsed.success) throw new ParseError('сводку оценок', parsed.error);
   const it = parsed.data.data.item;
+
+  const reviewCount = it.reviewCount ?? null;
+  // Когда оценок нет, для пользователей источник шлёт не null, а score 0 —
+  // асимметрично критикам (§6). Сохранить это значило бы утверждать «игроки
+  // поставили 0 из 10» там, где не поставил никто. Пустое — null (CLAUDE.md).
+  const hasVotes = reviewCount !== null && reviewCount > 0;
+
   return {
-    score: it.score ?? null,
+    score: hasVotes ? (it.score ?? null) : null,
     // Шкалы не смешивать: 100 у критиков, 10 у пользователей (§3).
     max: it.max ?? (kind === 'critic' ? 100 : 10),
-    reviewCount: it.reviewCount ?? null,
+    reviewCount,
   };
 }
 
