@@ -1,3 +1,5 @@
+import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
 import { describe, expect, it, vi } from 'vitest';
 import { HttpClient, HttpError, RateLimiter } from '../src/clients/http.js';
 import {
@@ -8,6 +10,7 @@ import {
   scoreStatsUrl,
 } from '../src/clients/metacritic/endpoints.js';
 import { metacriticUserAgent } from '../src/clients/metacritic/index.js';
+import { SERVICE_VERSION } from '../src/config/service.js';
 
 /** Часы и сон подменяются: тест не ждёт реального времени. */
 function fakeClock() {
@@ -189,10 +192,19 @@ describe('построители URL', () => {
     expect(imageUrl('catalog', null)).toBeNull();
   });
 
-  it('User-Agent называет проект и контакт (правило Metacritic)', () => {
+  it('User-Agent называет проект, версию и контакт (правило Metacritic)', () => {
     const ua = metacriticUserAgent('me@example.com');
 
     expect(ua).toContain('mcwatch');
+    expect(ua).toContain(SERVICE_VERSION);
     expect(ua).toContain('me@example.com');
+  });
+
+  it('версия сервиса не разъезжается с package.json', () => {
+    const pkg = JSON.parse(
+      readFileSync(join(import.meta.dirname, '..', 'package.json'), 'utf8'),
+    ) as { version: string };
+
+    expect(SERVICE_VERSION).toBe(pkg.version);
   });
 });

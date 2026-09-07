@@ -6,6 +6,12 @@
 
 export type ReviewKind = 'critic' | 'user';
 
+/**
+ * Словарь схемы (`db/schema.ts`), а не источника: Metacritic называет
+ * нейтральную тональность `neutral`, у нас она `mixed`. Перевод — в `parse.ts`.
+ */
+export type ReviewSentiment = 'positive' | 'mixed' | 'negative';
+
 /** Элемент списка (finder). Разработчика, платформ и видео в списке нет (§6). */
 export interface ListedGame {
   slug: string;
@@ -62,4 +68,10 @@ export interface Review {
   date: string | null;
   url: string | null;
   platform: string | null;
+  /**
+   * Заполняется, когда отзыв получен запросом с конкретной тональностью:
+   * отдельным полем источник её не отдаёт (§6), но при `filterBySentiment`
+   * она известна достоверно. При выборке `all` — `null`, не догадка.
+   */
+  sentiment: ReviewSentiment | null;
 }

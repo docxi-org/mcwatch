@@ -7,6 +7,7 @@ import {
   parseGameList,
   parseReviews,
   parseScoreStats,
+  toSchemaSentiment,
   ParseError,
 } from '../src/clients/metacritic/parse.js';
 
@@ -46,13 +47,17 @@ describe('списки finder', () => {
     expect(games.some((g) => g.metascore === null)).toBe(true);
   });
 
-  it('битый элемент отбрасывается, остальной список выживает', () => {
+  it('битый элемент отбрасывается, остальной список выживает и счёт ведётся', () => {
     const raw = fixture('finder-new-releases') as {
       data: { items: unknown[] };
     };
     raw.data.items[3] = { title: 'без слага' };
 
-    expect(parseGameList(raw).games).toHaveLength(19);
+    const { games, skipped } = parseGameList(raw);
+
+    expect(games).toHaveLength(19);
+    // Молчаливо укоротившийся список неотличим от честно короткого.
+    expect(skipped).toBe(1);
   });
 
   it('ответ неожиданной формы даёт ParseError, а не молчаливый пустой список', () => {
@@ -184,6 +189,29 @@ describe('отзывы', () => {
     expect(parseReviews(fixture('critic-list-empty'), 'critic')).toEqual({
       totalResults: 0,
       reviews: [],
+      skipped: 0,
     });
+  });
+
+  it('тональность проставляется только когда она достоверна', () => {
+    const raw = fixture('user-list-pc');
+
+    // Выборка `all`: источник тональность не сообщает — не выдумываем.
+    expect(parseReviews(raw, 'user').reviews.every((r) => r.sentiment === null)).toBe(
+      true,
+    );
+    // Выборка по фильтру: тональность известна для каждого элемента.
+    expect(
+      parseReviews(raw, 'user', 'negative').reviews.every(
+        (r) => r.sentiment === 'negative',
+      ),
+    ).toBe(true);
+  });
+
+  it('нейтральная тональность источника переводится в словарь схемы', () => {
+    // Источник говорит `neutral`, схема БД знает только `mixed`.
+    expect(toSchemaSentiment('neutral')).toBe('mixed');
+    expect(toSchemaSentiment('positive')).toBe('positive');
+    expect(toSchemaSentiment('negative')).toBe('negative');
   });
 });

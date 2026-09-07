@@ -1,5 +1,5 @@
 import { env } from '../../config/env.js';
-import { SERVICE_NAME } from '../../config/service.js';
+import { SERVICE_NAME, SERVICE_VERSION } from '../../config/service.js';
 import { HttpClient } from '../http.js';
 import {
   browsePageUrl,
@@ -16,9 +16,16 @@ import {
   parseGameList,
   parseReviews,
   parseScoreStats,
+  toSchemaSentiment,
   type ParsedList,
 } from './parse.js';
-import type { GameCard, Review, ReviewKind, ScoreStats } from './types.js';
+import type {
+  GameCard,
+  Review,
+  ReviewKind,
+  ReviewSentiment,
+  ScoreStats,
+} from './types.js';
 
 export * from './types.js';
 export { BROWSE_PAGE_SIZE, NEW_RELEASES_SIZE } from './endpoints.js';
@@ -27,13 +34,21 @@ export { BROWSE_PAGE_SIZE, NEW_RELEASES_SIZE } from './endpoints.js';
 const MIN_INTERVAL_MS = 1000;
 
 export function metacriticUserAgent(contact = env.CONTACT_EMAIL): string {
-  return `${SERVICE_NAME}/0.1 (+https://github.com/${SERVICE_NAME}; ${contact})`;
+  return `${SERVICE_NAME}/${SERVICE_VERSION} (+https://github.com/${SERVICE_NAME}; ${contact})`;
 }
+
+/**
+ * Верхняя граница отзывов за обход по видам — числа из `ARCHITECTURE` §4.1.
+ * Разные не случайно: отзывов пользователей больше, но они длиннее и шумнее.
+ */
+export const DEFAULT_MAX_REVIEWS: Record<ReviewKind, number> = {
+  critic: 40,
+  user: 30,
+};
 
 export interface MetacriticClientOptions {
   http?: HttpClient;
-  /** Верхняя граница отзывов одного вида за обход — защита от гигантов. */
-  maxReviews?: number;
+  maxReviews?: Partial<Record<ReviewKind, number>>;
 }
 
 /**
@@ -42,7 +57,7 @@ export interface MetacriticClientOptions {
  */
 export class MetacriticClient {
   private readonly http: HttpClient;
-  private readonly maxReviews: number;
+  private readonly maxReviews: Record<ReviewKind, number>;
 
   constructor(opts: MetacriticClientOptions = {}) {
     this.http =
@@ -51,7 +66,7 @@ export class MetacriticClient {
         userAgent: metacriticUserAgent(),
         minIntervalMs: MIN_INTERVAL_MS,
       });
-    this.maxReviews = opts.maxReviews ?? 40;
+    this.maxReviews = { ...DEFAULT_MAX_REVIEWS, ...opts.maxReviews };
   }
 
   /** Блок New Releases страницы `/game/` — 20 игр (ТЗ п.1). */
@@ -94,15 +109,21 @@ export class MetacriticClient {
   ): Promise<Review[]> {
     const collected: Review[] = [];
     const seen = new Set<string>();
+    const max = this.maxReviews[kind];
+
+    // Тональность известна достоверно только при запросе с фильтром: при
+    // `all` источник её не сообщает, и выдумывать её мы не станем.
+    const sentiment: ReviewSentiment | null =
+      opts.sentiment && opts.sentiment !== 'all'
+        ? toSchemaSentiment(opts.sentiment)
+        : null;
 
     // Критиков источник отдаёт по 10 независимо от `limit`; пользователей —
     // сколько попросишь. Просить больше потолка бессмысленно, меньше — дорого.
     const pageSize =
-      kind === 'critic'
-        ? CRITIC_PAGE_SIZE
-        : Math.min(this.maxReviews, USER_PAGE_SIZE_MAX);
+      kind === 'critic' ? CRITIC_PAGE_SIZE : Math.min(max, USER_PAGE_SIZE_MAX);
 
-    for (let offset = 0; offset < this.maxReviews; offset += pageSize) {
+    for (let offset = 0; offset < max; offset += pageSize) {
       const url = reviewListUrl(kind, slug, {
         platform: opts.platform ?? null,
         offset,
@@ -110,7 +131,11 @@ export class MetacriticClient {
         sentiment: opts.sentiment ?? 'all',
         sort: 'date',
       });
-      const { totalResults, reviews } = parseReviews(await this.http.getJson(url), kind);
+      const { totalResults, reviews } = parseReviews(
+        await this.http.getJson(url),
+        kind,
+        sentiment,
+      );
 
       // Порядок у источника нестабилен (§6): страницы могут пересекаться.
       for (const r of reviews) {
@@ -125,6 +150,6 @@ export class MetacriticClient {
       if (exhausted) break;
     }
 
-    return collected.slice(0, this.maxReviews);
+    return collected.slice(0, max);
   }
 }

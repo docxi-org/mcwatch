@@ -7,6 +7,7 @@ import type {
   ListedGame,
   Review,
   ReviewKind,
+  ReviewSentiment,
   ScoreStats,
 } from './types.js';
 
@@ -75,6 +76,12 @@ const listSchema = z.object({
 export interface ParsedList {
   totalResults: number | null;
   games: ListedGame[];
+  /**
+   * Сколько элементов ответа не прошли схему и отброшены. Молчаливо
+   * укоротившийся список неотличим от честно короткого — вызывающий код
+   * должен иметь возможность это заметить и залогировать.
+   */
+  skipped: number;
 }
 
 /**
@@ -86,9 +93,13 @@ export function parseGameList(raw: unknown): ParsedList {
   if (!outer.success) throw new ParseError('список игр', outer.error);
 
   const games: ListedGame[] = [];
+  let skipped = 0;
   for (const item of outer.data.data.items) {
     const parsed = listItemSchema.safeParse(item);
-    if (!parsed.success) continue;
+    if (!parsed.success) {
+      skipped++;
+      continue;
+    }
     const it = parsed.data;
     games.push({
       slug: it.slug,
@@ -100,7 +111,7 @@ export function parseGameList(raw: unknown): ParsedList {
     });
   }
 
-  return { totalResults: outer.data.data.totalResults ?? null, games };
+  return { totalResults: outer.data.data.totalResults ?? null, games, skipped };
 }
 
 // ── Карточка ───────────────────────────────────────────────────────────────
@@ -252,18 +263,39 @@ export function criticExternalId(r: {
 export interface ParsedReviews {
   totalResults: number | null;
   reviews: Review[];
+  /** См. `ParsedList.skipped`. */
+  skipped: number;
 }
 
-export function parseReviews(raw: unknown, kind: ReviewKind): ParsedReviews {
+/** Тональность источника в словарь схемы: `neutral` у нас зовётся `mixed`. */
+export function toSchemaSentiment(
+  s: 'positive' | 'neutral' | 'negative',
+): ReviewSentiment {
+  return s === 'neutral' ? 'mixed' : s;
+}
+
+/**
+ * @param sentiment Тональность запроса. Передаётся, когда список получен
+ *   фильтром `filterBySentiment`: тогда она достоверна для каждого элемента.
+ */
+export function parseReviews(
+  raw: unknown,
+  kind: ReviewKind,
+  sentiment: ReviewSentiment | null = null,
+): ParsedReviews {
   const outer = reviewListSchema.safeParse(raw);
   if (!outer.success) throw new ParseError('список отзывов', outer.error);
 
   const scoreMax = kind === 'critic' ? 100 : 10;
   const reviews: Review[] = [];
+  let skipped = 0;
 
   for (const item of outer.data.data.items) {
     const parsed = reviewSchema.safeParse(item);
-    if (!parsed.success) continue;
+    if (!parsed.success) {
+      skipped++;
+      continue;
+    }
     const r = parsed.data;
 
     const externalId =
@@ -275,7 +307,10 @@ export function parseReviews(raw: unknown, kind: ReviewKind): ParsedReviews {
             date: blankToNull(r.date),
             quote: r.quote,
           });
-    if (!externalId) continue;
+    if (!externalId) {
+      skipped++;
+      continue;
+    }
 
     reviews.push({
       externalId,
@@ -288,8 +323,9 @@ export function parseReviews(raw: unknown, kind: ReviewKind): ParsedReviews {
       date: blankToNull(r.date),
       url: blankToNull(r.url),
       platform: blankToNull(r.reviewedProduct?.platform?.name),
+      sentiment,
     });
   }
 
-  return { totalResults: outer.data.data.totalResults ?? null, reviews };
+  return { totalResults: outer.data.data.totalResults ?? null, reviews, skipped };
 }
