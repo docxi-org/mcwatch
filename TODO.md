@@ -5,7 +5,7 @@
 ## Действия
 
 - [x] G1 · Скелет: pnpm, TS strict, Hono, Drizzle + миграции, pino, `pnpm check` зелёный на пустом проекте — **сделано 2026-09-07**, см. `READY.md`
-- [ ] G1 · Разведка Metacritic: снять точные URL и apiKey JSON-бэкенда, сохранить фикстуры (landing, browse p.1, карточка, critic/user reviews) в `test/fixtures/`
+- [x] G1 · Разведка Metacritic: точные URL, фикстуры, переписанный §6 — **сделано 2026-09-07**, см. `READY.md`
 - [ ] G1 · `clients/metacritic`: список New Releases, список browse по странице, карточка, отзывы; rate-limit, UA, тесты на фикстурах
 - [ ] G1 · Воркер `crawler` + `crawl_state` (ротация landing→browse, сброс по дате) + `pnpm crawl --once`
 - [ ] G2 · `clients/openrouter` (AI SDK) + воркер `summarizer` с правилом обновления
