@@ -82,8 +82,15 @@ export interface GameCardDto {
   slug: string;
   title: string;
   coverUrl: string | null;
+  /** Страница игры на самом Metacritic — источник всех данных карточки. */
+  metacriticUrl: string;
   /** Страница проигрывателя с трейлером; `null` — трейлера нет. */
   videoUrl: string | null;
+  /**
+   * Кадр-заставка трейлера. Выводится из адреса проигрывателя, поэтому может
+   * не открыться — интерфейс обязан пережить это заглушкой.
+   */
+  videoPosterUrl: string | null;
   developer: string | null;
   publisher: string | null;
   description: string | null;

@@ -12,6 +12,7 @@ import {
   listPlatforms,
   MAX_PAGE_SIZE,
 } from '../db/repo/catalog.js';
+import { gamePageUrl, videoPosterUrl } from '../clients/metacritic/endpoints.js';
 import { loadSimilarityPool } from '../db/repo/embeddings.js';
 import { getLetsplay } from '../db/repo/letsplays.js';
 import { findSimilar } from '../workers/similarity.js';
@@ -78,7 +79,9 @@ export function createCatalogRoutes(db: Db): Hono {
       slug: game.slug,
       title: game.title,
       coverUrl: game.coverUrl,
+      metacriticUrl: gamePageUrl(game.slug),
       videoUrl: game.videoUrl,
+      videoPosterUrl: videoPosterUrl(game.videoUrl),
       developer: game.developer,
       publisher: game.publisher,
       description: game.description,

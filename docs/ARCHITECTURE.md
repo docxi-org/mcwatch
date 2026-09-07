@@ -261,10 +261,20 @@ JSON-бэкенд `backend.metacritic.com`, и весь сбор идёт чер
   `isLeadPlatform`, `relatedGameId`;
 - `video` — `jwPlayerId`, `embedUrl`, `manifestUrl`, `title`, `duration`.
   Ссылку на видео **брать отсюда**, не реконструировать из обложки;
+  кадр-заставка у того же идентификатора лежит по адресу
+  `cdn.jwplayer.com/thumbs/<jwPlayerId>-<ширина>.jpg` — 302 на
+  `assets-jpcust.jwpsrv.com` и настоящий JPEG 13–52 КБ, проверено на всех
+  пяти трейлерах базы. В карточке API отдаёт его как `videoPosterUrl`, но
+  это **вывод из формы чужого адреса, а не поле источника**: интерфейс
+  обязан пережить его отсутствие заглушкой;
 - `images[]` — `typeName` `mainImage` / `cardImage`, плюс `bucketType` и
   `bucketPath`.
 
 **Userscore на карточке нет.** `platforms[]` несёт только оценку критиков.
+
+**Человеческая страница игры** — `https://www.metacritic.com/game/<slug>/`,
+отвечает 200 без редиректа. Карточка API отдаёт её как `metacriticUrl`:
+читателю нужен путь к первоисточнику, а не только пересказ.
 
 #### Обложка
 

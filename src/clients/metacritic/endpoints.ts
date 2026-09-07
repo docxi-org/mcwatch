@@ -64,6 +64,14 @@ export function browsePageUrl(page: number, limit = BROWSE_PAGE_SIZE): string {
   });
 }
 
+/**
+ * Человеческая страница игры на самом Metacritic. Проверено 07.09.2026:
+ * `/game/<slug>/` отвечает 200 без редиректа для всех проверенных игр.
+ */
+export function gamePageUrl(slug: string): string {
+  return `${SITE_ORIGIN}/game/${encodeURIComponent(slug)}/`;
+}
+
 export function gameCardUrl(slug: string): string {
   return backend(`/games/metacritic/${encodeURIComponent(slug)}/web`, {});
 }
@@ -123,4 +131,20 @@ export function imageUrl(
 /** Страница трейлера у jwplayer по идентификатору из карточки. */
 export function videoUrlFromJwPlayerId(id: string | null): string | null {
   return id ? `https://cdn.jwplayer.com/players/${id}.html` : null;
+}
+
+const JW_PLAYER_URL = /^https:\/\/cdn\.jwplayer\.com\/players\/([A-Za-z0-9]+)\.html$/;
+
+/**
+ * Кадр-заставка трейлера. Metacritic отдаёт только адрес проигрывателя, но у
+ * jwplayer к тому же идентификатору есть постер по неизменному адресу
+ * `/thumbs/<id>-<ширина>.jpg` — проверено 07.09.2026 на всех пяти трейлерах
+ * в базе: 302 на `assets-jpcust.jwpsrv.com` и настоящий JPEG 13–52 КБ (§6).
+ *
+ * Это вывод из формы чужого адреса, а не поле источника: если постера не
+ * окажется, интерфейс обязан пережить это заглушкой, а не пустой рамкой.
+ */
+export function videoPosterUrl(videoUrl: string | null, width = 720): string | null {
+  const id = videoUrl?.match(JW_PLAYER_URL)?.[1];
+  return id ? `https://cdn.jwplayer.com/thumbs/${id}-${width}.jpg` : null;
 }

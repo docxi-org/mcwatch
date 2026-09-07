@@ -1,6 +1,7 @@
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
+import { gamePageUrl, videoPosterUrl } from '../src/clients/metacritic/endpoints.js';
 import {
   criticExternalId,
   parseGameCard,
@@ -230,5 +231,44 @@ describe('отзывы', () => {
     expect(toSchemaSentiment('neutral')).toBe('mixed');
     expect(toSchemaSentiment('positive')).toBe('positive');
     expect(toSchemaSentiment('negative')).toBe('negative');
+  });
+});
+
+describe('заставка трейлера', () => {
+  it('выводится из адреса проигрывателя по неизменной форме jwplayer', () => {
+    // Проверено вживую 07.09.2026 на всех пяти трейлерах базы: 302 на
+    // assets-jpcust.jwpsrv.com и настоящий JPEG.
+    expect(videoPosterUrl('https://cdn.jwplayer.com/players/Eibtv31Y.html')).toBe(
+      'https://cdn.jwplayer.com/thumbs/Eibtv31Y-720.jpg',
+    );
+  });
+
+  it('ширина — параметр, а не число внутри', () => {
+    expect(videoPosterUrl('https://cdn.jwplayer.com/players/Eibtv31Y.html', 320)).toBe(
+      'https://cdn.jwplayer.com/thumbs/Eibtv31Y-320.jpg',
+    );
+  });
+
+  it('нет трейлера — нет и заставки', () => {
+    expect(videoPosterUrl(null)).toBeNull();
+  });
+
+  it('чужая форма адреса не превращается в выдуманную ссылку', () => {
+    // Молчаливо собрать постер из адреса, который мы не узнали, значило бы
+    // отдать интерфейсу заведомо битую картинку.
+    expect(videoPosterUrl('https://www.youtube.com/watch?v=abc')).toBeNull();
+    expect(videoPosterUrl('https://cdn.jwplayer.com/players/Eibtv31Y')).toBeNull();
+  });
+});
+
+describe('страница игры на Metacritic', () => {
+  it('собирается из slug по проверенной форме', () => {
+    expect(gamePageUrl('onimusha-way-of-the-sword')).toBe(
+      'https://www.metacritic.com/game/onimusha-way-of-the-sword/',
+    );
+  });
+
+  it('slug экранируется: он приходит из чужих данных', () => {
+    expect(gamePageUrl('a b/c')).toBe('https://www.metacritic.com/game/a%20b%2Fc/');
   });
 });

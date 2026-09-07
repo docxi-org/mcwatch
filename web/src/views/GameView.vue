@@ -21,6 +21,8 @@ const game = ref<GameCardDto | null>(null);
 const loading = ref(true);
 const failure = ref<ApiError | null>(null);
 const videoOpen = ref(false);
+/** Заставка выводится из адреса проигрывателя и может не открыться. */
+const posterBroken = ref(false);
 let inFlight: AbortController | null = null;
 
 async function load(slug: string): Promise<void> {
@@ -31,6 +33,7 @@ async function load(slug: string): Promise<void> {
   loading.value = true;
   failure.value = null;
   videoOpen.value = false;
+  posterBroken.value = false;
   try {
     game.value = await fetchGame(slug, controller.signal);
   } catch (err) {
@@ -92,6 +95,9 @@ const userNote = computed(() =>
     : `лучшее из ${countText(best.value.platformCount, 'платформы', 'платформ', 'платформ')}`,
 );
 
+/** Адрес без протокола: в колонке 300 px полный не помещается. */
+const shortVideoUrl = computed(() => (game.value?.videoUrl ?? '').replace(/^https?:\/\//, ''));
+
 const hasAnySummary = computed(
   () => Boolean(game.value?.summaries.critic) || Boolean(game.value?.summaries.user),
 );
@@ -150,18 +156,49 @@ const hasAnySummary = computed(
               <span class="facts__key mono">{{ fact.k }}</span>
               <span class="facts__value">{{ fact.v }}</span>
             </div>
+            <!-- Источник данных карточки: откуда всё это взято. -->
+            <div class="facts__row">
+              <span class="facts__key mono">ИСТОЧНИК</span>
+              <a
+                class="facts__value facts__link"
+                :href="game.metacriticUrl"
+                target="_blank"
+                rel="noopener noreferrer"
+                >страница на Metacritic ↗</a
+              >
+            </div>
           </div>
 
           <div v-if="game.videoUrl" class="trailer">
             <button
               type="button"
               class="trailer__btn hatch"
-              aria-label="Смотреть трейлер"
+              :aria-label="`Смотреть трейлер игры ${game.title}`"
               @click="videoOpen = true"
             >
+              <img
+                v-if="game.videoPosterUrl && !posterBroken"
+                class="trailer__poster"
+                :src="game.videoPosterUrl"
+                alt=""
+                loading="lazy"
+                decoding="async"
+                @error="posterBroken = true"
+              />
               <span class="trailer__play" aria-hidden="true"></span>
             </button>
             <span class="trailer__note mono">трейлер · откроется в модальном окне</span>
+            <!--
+              Ссылка рядом с кнопкой: проигрыватель в окне показать может, а
+              скопировать адрес — нет. ТЗ просит именно ссылку на видео.
+            -->
+            <a
+              class="trailer__link mono"
+              :href="game.videoUrl"
+              target="_blank"
+              rel="noopener noreferrer"
+              >{{ shortVideoUrl }} ↗</a
+            >
           </div>
         </aside>
 
@@ -351,6 +388,14 @@ const hasAnySummary = computed(
   text-align: right;
 }
 
+.facts__link {
+  color: var(--accent);
+}
+
+.facts__link:hover {
+  color: var(--accent-hi);
+}
+
 .trailer {
   display: flex;
   flex-direction: column;
@@ -361,6 +406,8 @@ const hasAnySummary = computed(
   position: relative;
   aspect-ratio: 16 / 9;
   width: 100%;
+  padding: 0;
+  overflow: hidden;
   background-color: #1b1b20;
   border: 1px solid var(--border);
   border-radius: 10px;
@@ -368,18 +415,49 @@ const hasAnySummary = computed(
   place-items: center;
 }
 
+.trailer__poster {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+/* Кадр приглушается, чтобы треугольник читался поверх любого сюжета. */
+.trailer__btn:hover .trailer__poster {
+  opacity: 0.75;
+}
+
 .trailer__btn:hover {
   border-color: var(--accent);
 }
 
 .trailer__play {
-  display: block;
+  position: relative;
+  display: grid;
+  place-items: center;
+  width: 46px;
+  height: 46px;
+  border-radius: 999px;
+  background: rgba(12, 12, 13, 0.7);
+  border: 1px solid #3a3a42;
+}
+
+.trailer__play::after {
+  content: '';
   width: 0;
   height: 0;
-  border-left: 14px solid #e6e7ea;
+  border-left: 13px solid #e6e7ea;
   border-top: 9px solid transparent;
   border-bottom: 9px solid transparent;
   margin-left: 4px;
+}
+
+.trailer__link {
+  font-size: 10.5px;
+  line-height: 1.5;
+  word-break: break-all;
 }
 
 .trailer__note {
