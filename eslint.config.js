@@ -4,7 +4,15 @@ import tseslint from 'typescript-eslint';
 
 export default tseslint.config(
   {
-    ignores: ['dist/**', 'node_modules/**', 'drizzle/**', 'data/**', 'web/dist/**'],
+    ignores: [
+      'dist/**',
+      'node_modules/**',
+      'drizzle/**',
+      'data/**',
+      'web/dist/**',
+      // Макеты из Claude Design — чужой код, не наш стиль.
+      'ui/**',
+    ],
   },
   js.configs.recommended,
   ...tseslint.configs.strictTypeChecked,

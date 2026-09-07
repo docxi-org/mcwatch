@@ -7,6 +7,8 @@ import { SERVICE_NAME } from '../config/service.js';
 import {
   EMBEDDING_DIMENSIONS,
   EMBEDDING_MODEL,
+  LETSPLAY_LIMITS,
+  LETSPLAY_MODEL,
   SUMMARY_LIMITS,
   SUMMARY_MODEL,
 } from '../config/models.js';
@@ -14,8 +16,12 @@ import type { Review, ReviewKind } from './metacritic/index.js';
 
 /**
  * Единственная дверь к LLM. Всё — через один ключ OpenRouter и Vercel AI SDK
- * (CLAUDE.md, «Зафиксированные решения»). Модель делает ровно три вещи, и эта
- * первая: резюме отзывов.
+ * (CLAUDE.md, «Зафиксированные решения»). Здесь четыре задачи: резюме отзывов,
+ * эмбеддинги, судья «та ли игра» и заключение по летсплею.
+ *
+ * Судья добавлен решением владельца 07.09.2026 сверх трёх задач из CLAUDE.md:
+ * тождество игры — семантика, и два алгоритмических отсева на ней провалились
+ * (`docs/ARCHITECTURE.md` §6).
  */
 
 export class MissingApiKeyError extends Error {
@@ -45,6 +51,80 @@ export const summarySchema = z.object({
 
 export type ReviewSummary = z.infer<typeof summarySchema>;
 
+/**
+ * Суждение о том, та ли это игра. Отдельный вызов, а не догадка кода:
+ * тождество игры — семантика, и алгоритмические отсевы на ней провалились
+ * дважды (§6). `confidence: low` трактуется как сомнение, не как приговор.
+ */
+export const videoMatchSchema = z.object({
+  matches: z.boolean().describe('Играют ли в ролике именно в эту игру'),
+  confidence: z.enum(['high', 'medium', 'low']),
+  reason: z.string().max(200).describe('Кратко по-русски, на чём основан вывод'),
+});
+
+export type VideoMatch = z.infer<typeof videoMatchSchema>;
+
+export const letsplayConclusionSchema = z.object({
+  conclusion: z
+    .string()
+    .max(LETSPLAY_LIMITS.maxConclusionChars)
+    .describe('Пересказ впечатления автора ролика, 3–5 предложений'),
+  highlights: z
+    .array(z.string().max(LETSPLAY_LIMITS.maxPointChars))
+    .max(LETSPLAY_LIMITS.maxPoints)
+    .describe('Что автор отметил особо'),
+  vibe: z
+    .enum(['positive', 'mixed', 'negative'])
+    .describe('Общее отношение автора к игре'),
+});
+
+export type LetsplayConclusion = z.infer<typeof letsplayConclusionSchema>;
+
+export interface VideoInfo {
+  title: string;
+  channel: string | null;
+}
+
+export interface GameInfo {
+  title: string;
+  developer: string | null;
+  genres: string[];
+  description: string | null;
+}
+
+const JUDGE_PROMPT = [
+  'Ты решаешь ровно один вопрос: играют ли в ролике в ТУ ЖЕ САМУЮ игру,',
+  'что описана в карточке. Только тождество игры, ничего больше.',
+  'matches=false, если это другая игра — пусть даже похожая по названию или',
+  'из той же серии.',
+  'Жанр, разработчик и описание даны для опознания, а НЕ как требования:',
+  'расхождение жанра или описания само по себе не делает ролик чужим, эти',
+  'поля бывают неточными.',
+  'Опирайся прежде всего на речь автора: называет ли он игру, о чём говорит.',
+  'Если в речи явно называют другую игру — matches=false.',
+  'confidence=low, если по расшифровке нельзя судить уверенно.',
+  'reason — по-русски, кратко.',
+].join(' ');
+
+const CONCLUSION_PROMPT = [
+  'Ты пересказываешь, что автор летсплея говорит об игре.',
+  'Пиши ПО-РУССКИ независимо от языка ролика.',
+  'Опирайся только на речь автора: ничего не додумывай и не добавляй знаний об',
+  'игре со стороны. Это пересказ ЕГО впечатления, а не твой обзор.',
+  'Если автор о чём-то не говорил — не пиши об этом.',
+  `highlights — до ${LETSPLAY_LIMITS.maxPoints} коротких фраз, что он отметил особо.`,
+  'vibe — его общее отношение к игре.',
+].join(' ');
+
+function gameBlock(game: GameInfo): string {
+  return [
+    `Название: ${game.title}`,
+    `Разработчик: ${game.developer ?? '—'}`,
+    `Жанры: ${game.genres.join(', ') || '—'}`,
+    `Описание: ${game.description ?? '—'}`,
+  ].join('\n');
+}
+
 const KIND_NAME: Record<ReviewKind, string> = {
   critic: 'профессиональных рецензентов',
   user: 'игроков',
@@ -69,8 +149,11 @@ export interface OpenRouterClientOptions {
   apiKey?: string | undefined;
   model?: string;
   embeddingModel?: string;
+  letsplayModel?: string;
   /** Таймаут одной попытки, мс. */
   timeoutMs?: number;
+  /** Таймаут вызовов по летсплеям: вход там на порядок больше. */
+  letsplayTimeoutMs?: number;
   /** Число попыток, включая первую. */
   maxAttempts?: number;
 }
@@ -86,9 +169,18 @@ const DEFAULT_TIMEOUT_MS = 30_000;
 /** Сколько всего попыток, включая первую. */
 const DEFAULT_MAX_ATTEMPTS = 3;
 
+/**
+ * Летсплеям нужен свой, больший потолок: на вход уходит расшифровка целиком —
+ * 13–23 тысячи токенов против трёх тысяч у резюме. На общем таймауте прогон
+ * падал по времени, хотя запрос был исправен.
+ */
+const DEFAULT_LETSPLAY_TIMEOUT_MS = 120_000;
+
 export class OpenRouterClient {
   private readonly model: string;
   private readonly embeddingModel: string;
+  private readonly letsplayModel: string;
+  private readonly letsplayTimeoutMs: number;
   private readonly timeoutMs: number;
   private readonly maxAttempts: number;
   private readonly provider: ReturnType<typeof createOpenRouter>;
@@ -99,6 +191,8 @@ export class OpenRouterClient {
 
     this.model = opts.model ?? SUMMARY_MODEL;
     this.embeddingModel = opts.embeddingModel ?? EMBEDDING_MODEL;
+    this.letsplayModel = opts.letsplayModel ?? LETSPLAY_MODEL;
+    this.letsplayTimeoutMs = opts.letsplayTimeoutMs ?? DEFAULT_LETSPLAY_TIMEOUT_MS;
     this.timeoutMs = opts.timeoutMs ?? DEFAULT_TIMEOUT_MS;
     this.maxAttempts = opts.maxAttempts ?? DEFAULT_MAX_ATTEMPTS;
     this.provider = createOpenRouter({
@@ -146,6 +240,57 @@ export class OpenRouterClient {
     }
 
     throw lastErr;
+  }
+
+  /**
+   * Тот ли это ролик. Расшифровка уходит ЦЕЛИКОМ: 13 тысяч токенов — это 7%
+   * контекста и меньше цента, а урезание до выдержек роняло точность (§6).
+   */
+  async judgeVideoMatch(
+    game: GameInfo,
+    video: VideoInfo,
+    transcript: string,
+  ): Promise<VideoMatch> {
+    const { output } = await this.withRetries(() =>
+      generateText({
+        model: this.provider.chat(this.letsplayModel),
+        output: Output.object({ schema: videoMatchSchema }),
+        system: JUDGE_PROMPT,
+        prompt: [
+          `ИГРА\n${gameBlock(game)}`,
+          `РОЛИК\nНазвание: ${video.title}\nКанал: ${video.channel ?? '—'}`,
+          `РАСШИФРОВКА РЕЧИ АВТОРА (${transcript.length} знаков)\n${transcript}`,
+        ].join('\n\n'),
+        providerOptions: { openrouter: { reasoning: { enabled: false } } },
+        abortSignal: AbortSignal.timeout(this.letsplayTimeoutMs),
+        maxRetries: 0,
+      }),
+    );
+    return output;
+  }
+
+  /** Заключение по летсплею: пересказ впечатления автора, не наш обзор. */
+  async concludeLetsplay(
+    game: GameInfo,
+    video: VideoInfo,
+    transcript: string,
+  ): Promise<LetsplayConclusion> {
+    const { output } = await this.withRetries(() =>
+      generateText({
+        model: this.provider.chat(this.letsplayModel),
+        output: Output.object({ schema: letsplayConclusionSchema }),
+        system: CONCLUSION_PROMPT,
+        prompt: [
+          `ИГРА: ${game.title}`,
+          `РОЛИК: ${video.title} (канал ${video.channel ?? '—'})`,
+          `РАСШИФРОВКА РЕЧИ АВТОРА\n${transcript}`,
+        ].join('\n\n'),
+        providerOptions: { openrouter: { reasoning: { enabled: false } } },
+        abortSignal: AbortSignal.timeout(this.timeoutMs),
+        maxRetries: 0,
+      }),
+    );
+    return output;
   }
 
   /**

@@ -1,12 +1,14 @@
 import { desc } from 'drizzle-orm';
 import type { Logger } from 'pino';
 import { MetacriticClient } from '../clients/metacritic/index.js';
+import { YouTubeClient } from '../clients/youtube.js';
 import { MissingApiKeyError, OpenRouterClient } from '../clients/openrouter.js';
 import { componentLogger } from '../config/logger.js';
 import type { Db } from '../db/index.js';
 import { games } from '../db/schema.js';
 import { runCrawlOnce } from './crawler.js';
 import { runEmbedOnce } from './embedder.js';
+import { runLetsplayOnce } from './letsplay.js';
 import { nullReporter, type Reporter } from './monitor.js';
 import { Scheduler, type Stage } from './scheduler.js';
 import { runSummarizeOnce } from './summarizer.js';
@@ -77,6 +79,18 @@ export function createStages(
         name: 'embed',
         run: async () => {
           await runEmbedOnce({ db, client, log, reporter });
+        },
+      },
+      {
+        name: 'letsplay',
+        run: async () => {
+          await runLetsplayOnce({
+            db,
+            youtube: new YouTubeClient(),
+            llm: client,
+            log,
+            reporter,
+          });
         },
       },
     );

@@ -13,8 +13,14 @@ import {
   MAX_PAGE_SIZE,
 } from '../db/repo/catalog.js';
 import { loadSimilarityPool } from '../db/repo/embeddings.js';
+import { getLetsplay } from '../db/repo/letsplays.js';
 import { findSimilar } from '../workers/similarity.js';
-import type { GameCardDto, GameListDto, SimilarGameDto } from './types.js';
+import type {
+  GameCardDto,
+  GameListDto,
+  LetsplayDto,
+  SimilarGameDto,
+} from './types.js';
 
 /**
  * Каталог: список, карточка, справочник платформ. Требования — `docs/TASK.md`,
@@ -84,12 +90,44 @@ export function createCatalogRoutes(db: Db): Hono {
       summaries: getSummaries(db, slug),
       reviewCounts: getReviewCounts(db, slug),
       similar: similarFor(db, slug),
+      letsplay: letsplayFor(db, slug),
     };
 
     return c.json(card);
   });
 
   return app;
+}
+
+/**
+ * Заключение по летсплею. Хранится строкой JSON, потому что структура —
+ * ответ модели; наружу отдаётся разобранной.
+ */
+function letsplayFor(db: Db, slug: string): LetsplayDto | null {
+  const row = getLetsplay(db, slug);
+  if (!row) return null;
+
+  let parsed: { conclusion?: string; highlights?: string[]; vibe?: string } = {};
+  if (row.conclusion) {
+    try {
+      parsed = JSON.parse(row.conclusion) as typeof parsed;
+    } catch {
+      // Битую запись показываем как отсутствие заключения, а не роняем карточку.
+      parsed = {};
+    }
+  }
+
+  return {
+    url: row.videoId ? `https://www.youtube.com/watch?v=${row.videoId}` : null,
+    title: row.title,
+    channel: row.channel,
+    views: row.views,
+    durationS: row.durationS,
+    conclusion: parsed.conclusion ?? null,
+    highlights: parsed.highlights ?? [],
+    vibe: (parsed.vibe as LetsplayDto['vibe']) ?? null,
+    status: row.status,
+  };
 }
 
 /**

@@ -59,6 +59,25 @@ export interface SimilarGameDto {
   score: number;
 }
 
+export interface LetsplayDto {
+  /** Ссылка на ролик. `null`, если подходящего не нашлось. */
+  url: string | null;
+  title: string | null;
+  channel: string | null;
+  views: number | null;
+  durationS: number | null;
+  /** Пересказ впечатления автора ролика. */
+  conclusion: string | null;
+  highlights: string[];
+  vibe: 'positive' | 'mixed' | 'negative' | null;
+  /**
+   * `done` — заключение есть; `no_video` — подходящего ролика не нашлось;
+   * `no_transcript` — ролики есть, но без речи; `pending` — ещё не искали;
+   * `failed` — попытка сорвалась.
+   */
+  status: 'pending' | 'no_video' | 'no_transcript' | 'done' | 'failed';
+}
+
 export interface GameCardDto {
   slug: string;
   title: string;
@@ -81,6 +100,8 @@ export interface GameCardDto {
   /** Сколько отзывов сохранено по видам. */
   reviewCounts: { critic: number; user: number };
   similar: SimilarGameDto[];
+  /** `null` — игру ещё не обрабатывал воркер летсплеев. */
+  letsplay: LetsplayDto | null;
 }
 
 export interface PlatformDto {
