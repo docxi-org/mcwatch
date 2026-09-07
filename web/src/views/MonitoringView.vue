@@ -8,7 +8,7 @@ import type {
   WorkerStatusDto,
 } from '../api/types.js';
 import { useEventStream } from '../lib/eventStream.js';
-import { agoText, clockText } from '../lib/format.js';
+import { agoText, clockText, countText, dateText } from '../lib/format.js';
 
 /**
  * Служебный экран: статусы воркеров, счётчики, журнал и принудительный
@@ -32,10 +32,16 @@ const STATE_TEXT: Record<WorkerStatusDto['state'], string> = {
   error: 'ERROR',
 };
 
-const PHASE_NOTE: Record<CrawlStateDto['phase'], string> = {
-  landing: 'первые 20 игр с главной',
-  browse: 'очередная страница общего списка',
-};
+/**
+ * Что берём следующим заходом — фразой, а не внутренним значением. `browse` и
+ * номер страницы сами по себе человеку ничего не говорят (владелец спросил об
+ * этом дважды), поэтому они уходят в техническую подпись под фразой.
+ */
+function nextTargetText(crawl: CrawlStateDto): string {
+  return crawl.phase === 'landing'
+    ? 'главная Metacritic, раздел New Releases'
+    : `страница ${crawl.nextPage} общего списка`;
+}
 
 const RUN_RESULT: Record<Exclude<RunOutcome, never>, { code: string; text: string; tone: string }> =
   {
@@ -359,24 +365,26 @@ const quietJournal = computed(() => loaded.value && events.value.length === 0);
         </div>
         <div v-if="crawl" class="crawl">
           <div class="crawl__cell">
-            <span class="crawl__key mono">ДАТА СБОРА</span>
-            <span class="crawl__value">{{ crawl.date }}</span>
-            <span class="crawl__note mono">календарная дата UTC</span>
+            <span class="crawl__key mono">ДЕНЬ СБОРА</span>
+            <span class="crawl__value">{{ dateText(crawl.date) }}</span>
+            <span class="crawl__note mono"
+              >в полночь UTC отсчёт начнётся заново с главной</span
+            >
+          </div>
+          <div class="crawl__cell crawl__cell--wide">
+            <span class="crawl__key mono">СЛЕДУЮЩИЙ ЗАХОД ВОЗЬМЁТ</span>
+            <span class="crawl__value">{{ nextTargetText(crawl) }}</span>
+            <span class="crawl__note mono"
+              >одна страница за заход · phase: {{ crawl.phase }} · nextPage:
+              {{ crawl.nextPage }}</span
+            >
           </div>
           <div class="crawl__cell">
-            <span class="crawl__key mono">ФАЗА</span>
-            <span class="crawl__value">{{ crawl.phase }}</span>
-            <span class="crawl__note mono">{{ PHASE_NOTE[crawl.phase] }}</span>
-          </div>
-          <div class="crawl__cell">
-            <span class="crawl__key mono">СЛЕДУЮЩАЯ СТРАНИЦА</span>
-            <span class="crawl__value">{{ crawl.nextPage }}</span>
-            <span class="crawl__note mono">с неё начнётся следующий заход</span>
-          </div>
-          <div class="crawl__cell">
-            <span class="crawl__key mono">ОБРАБОТАНО ЗА ДЕНЬ</span>
-            <span class="crawl__value">{{ crawl.processedToday }}</span>
-            <span class="crawl__note mono">растёт на каждой игре</span>
+            <span class="crawl__key mono">СОБРАНО ЗА ДЕНЬ</span>
+            <span class="crawl__value">{{
+              countText(crawl.processedToday, 'игра', 'игры', 'игр')
+            }}</span>
+            <span class="crawl__note mono">без повторов: одна игра за день один раз</span>
           </div>
         </div>
         <div v-else class="empty">
@@ -865,16 +873,17 @@ const quietJournal = computed(() => loaded.value && events.value.length === 0);
 
 .crawl {
   display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
+  grid-template-columns: minmax(0, 1fr);
   gap: 1px;
   border: 1px solid var(--border);
   border-radius: var(--r-md);
   overflow: hidden;
 }
 
+/* Средней ячейке нужно место: там фраза, а не число. */
 @media (min-width: 700px) {
   .crawl {
-    grid-template-columns: repeat(4, minmax(0, 1fr));
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1.6fr) minmax(0, 1fr);
   }
 }
 
