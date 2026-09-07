@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   agoText,
+  checkedCounterText,
   countText,
   dateText,
   durationText,
@@ -88,5 +89,21 @@ describe('летсплей', () => {
     expect(durationText(3725)).toBe('1:02:05');
     expect(durationText(605)).toBe('10:05');
     expect(durationText(null)).toBe('длительность неизвестна');
+  });
+});
+
+describe('счётчик «проверено»', () => {
+  it('прогоны до появления колонки показывают прочерк, а не ноль', () => {
+    // На боевом было «проверено 0 · обработано 84» — видимое противоречие.
+    expect(checkedCounterText(0, 84)).toBe('—');
+  });
+
+  it('настоящий ноль у воркера, который ещё не работал, остаётся нулём', () => {
+    expect(checkedCounterText(0, 0)).toBe('0');
+  });
+
+  it('обычное число показывается как есть', () => {
+    expect(checkedCounterText(33, 0)).toBe('33');
+    expect(checkedCounterText(5, 5)).toBe('5');
   });
 });

@@ -364,8 +364,12 @@ flowchart LR
 | `POST /api/crawl/run` | Принудительный запуск. 202 · 409 если идёт · 503 если планировщик выключен |
 | `GET /api/health` | Проверка живости; работает и без базы |
 
-Полный контракт с примерами ответов — [`docs/UI-BRIEF.md`](docs/UI-BRIEF.md) и
-[`docs/UI-BRIEF-MONITORING.md`](docs/UI-BRIEF-MONITORING.md).
+Полный контракт — [`docs/ARCHITECTURE.md` §5](docs/ARCHITECTURE.md); формы
+ответов объявлены в `src/api/types.ts`, и фронт берёт их оттуда типовым
+импортом. Брифы [`docs/UI-BRIEF.md`](docs/UI-BRIEF.md) и
+[`docs/UI-BRIEF-MONITORING.md`](docs/UI-BRIEF-MONITORING.md) — исторические
+документы, отправленные дизайнеру: они описывают контракт на момент 07.09.2026
+и с тех пор отстали.
 
 ---
 

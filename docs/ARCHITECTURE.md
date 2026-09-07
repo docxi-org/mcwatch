@@ -200,16 +200,59 @@ youtubei.js search («<title> let's play») → до 5 кандидатов по
 Статусы: `done` (заключение есть), `no_video` (подходящего не нашлось),
 `no_transcript` (ролики есть, но без речи), `failed` (сбой, будет повтор).
 
-## 5. API (черновик)
+## 5. API
 
-```
-GET  /api/games?platform=&q=&sort=metascore|userscore|date&page=
-GET  /api/games/:slug            карточка + platforms + summaries + letsplay + similar
-GET  /api/platforms              список для фильтра
-GET  /api/status                 worker_status + crawl_state + очередь
-GET  /api/events                 SSE: status, log
-POST /api/crawl/run              принудительный запуск (409, если идёт)
-```
+Живой контракт. Формы ответов — `src/api/types.ts`, оттуда же их берёт фронт
+типовым импортом. Брифы в `docs/UI-BRIEF*.md` — исторические документы,
+отправленные дизайнеру, и контрактом больше не являются.
+
+### Каталог
+
+| Маршрут | Что отдаёт |
+|---|---|
+| `GET /api/games` | Страница списка + `total` |
+| `GET /api/games/:slug` | Карточка целиком; 404 при неизвестном slug |
+| `GET /api/platforms` | Платформы со счётчиком игр, по алфавиту |
+| `GET /api/facets` | `{ withLetsplay, withTrailer }` — числа для чипов |
+
+Параметры `GET /api/games`, все необязательные:
+
+| Параметр | Значения | По умолчанию |
+|---|---|---|
+| `platform` | точное имя платформы из `/api/platforms` | все |
+| `q` | подстрока названия, регистр не важен | — |
+| `sort` | `metascore` \| `userscore` \| `date` \| `title` | `date` |
+| `letsplay` | `1` — только игры с **готовым заключением** (`status='done'`) | выкл. |
+| `trailer` | `1` — только игры с непустым `videoUrl` | выкл. |
+| `page` | целое ≥ 1 | 1 |
+| `pageSize` | целое 1–100 | 24 |
+
+Карточка помимо полей ТЗ несёт то, что выведено из адресов источника (§6):
+`metacriticUrl` — страница игры на Metacritic, `videoPosterUrl` — кадр-заставка
+трейлера (может не открыться, интерфейс обязан пережить). Плюс `letsplay` —
+заключение или причина его отсутствия, и `similar` — похожие игры.
+
+### Мониторинг
+
+| Маршрут | Что отдаёт |
+|---|---|
+| `GET /api/status` | Снимок целиком |
+| `GET /api/events` | Поток SSE: снимки состояния и события журнала |
+| `POST /api/crawl/run` | Принудительный запуск: 202 · 409 если идёт · 503 если планировщик выключен |
+| `GET /api/health` | Живость; работает и без базы |
+
+`GET /api/status` — `workers[]`, `crawl`, `cycleRunning`, `schedulerEnabled`,
+`letsplayOutcomes`, `events[]`, `serverTime`. Тонкости, которых нет в брифе:
+
+- у воркера три счётчика — `checkedTotal` (рассмотрено), `processedTotal`
+  (получен результат), `failedTotal`; инвариант `checked ≥ processed` верен
+  для прогонов после появления колонки, у прежних `checkedTotal = 0`, и экран
+  показывает там прочерк, а не ноль;
+- `crawl.nextUrl` — человеческий адрес того, что возьмёт следующий заход;
+- `letsplayOutcomes` — раскладка по исходам, считается по таблице `letsplays`,
+  а не копится в счётчиках;
+- кадр `status` в потоке несёт только `workers` и `cycleRunning` — фазы обхода
+  и журнала в нём нет, поэтому экран дотягивает снимок запросом (§9.2).
 
 ## 6. Знание об источниках
 

@@ -112,3 +112,12 @@ export function durationText(seconds: number | null): string {
   const p = (n: number): string => String(n).padStart(2, '0');
   return h > 0 ? `${h}:${p(m)}:${p(s)}` : `${m}:${p(s)}`;
 }
+
+/**
+ * Счётчик «проверено» у прогонов, сделанных до появления самой колонки, пуст.
+ * Ноль рядом с непустым «обработано» читался бы как противоречие, поэтому
+ * там прочерк: мы не знаем это число, а не знаем, что оно ноль.
+ */
+export function checkedCounterText(checked: number, processed: number): string {
+  return checked === 0 && processed > 0 ? '—' : String(checked);
+}

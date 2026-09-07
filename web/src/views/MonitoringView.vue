@@ -8,7 +8,13 @@ import type {
   WorkerStatusDto,
 } from '../api/types.js';
 import { useEventStream } from '../lib/eventStream.js';
-import { agoText, clockText, countText, dateText } from '../lib/format.js';
+import {
+  agoText,
+  checkedCounterText,
+  clockText,
+  countText,
+  dateText,
+} from '../lib/format.js';
 
 /**
  * Служебный экран: статусы воркеров, счётчики, журнал и принудительный
@@ -162,6 +168,11 @@ onBeforeUnmount(() => {
 
 const activeWorker = computed(() => workers.value.find((w) => w.state === 'running'));
 
+/** Есть ли воркеры, у которых «проверено» неизвестно, а не равно нулю. */
+const hasUnknownChecked = computed(() =>
+  workers.value.some((w) => w.checkedTotal === 0 && w.processedTotal > 0),
+);
+
 const cycleCard = computed(() => {
   if (cycleRunning.value && stream.connected.value) {
     return {
@@ -308,7 +319,9 @@ const quietJournal = computed(() => loaded.value && events.value.length === 0);
                 сломанным.
               -->
               <span class="counter">
-                <span class="counter__value counter__value--dim mono">{{ w.checkedTotal }}</span>
+                <span class="counter__value counter__value--dim mono">{{
+                  checkedCounterText(w.checkedTotal, w.processedTotal)
+                }}</span>
                 <span class="counter__label mono">ПРОВЕРЕНО</span>
               </span>
               <span class="counter">
@@ -353,9 +366,13 @@ const quietJournal = computed(() => loaded.value && events.value.length === 0);
           </div>
         </div>
 
-        <span class="hint"
-          >Счётчики накопительные — за всё время жизни сервиса, а не за последний цикл.</span
-        >
+        <span class="hint">
+          Счётчики накопительные — за всё время жизни сервиса, а не за последний цикл.
+          <template v-if="hasUnknownChecked">
+            Прочерк в «проверено» — счётчик появился позже самих прогонов, и за них это число
+            неизвестно.
+          </template>
+        </span>
       </section>
 
       <section class="section section--gap">
