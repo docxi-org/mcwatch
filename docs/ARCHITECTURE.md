@@ -136,34 +136,108 @@ POST /api/crawl/run              принудительный запуск (409,
 
 ## 6. Знание об источниках
 
-### Metacritic (проверено 07.09.2026)
+### Metacritic (проверено 07.09.2026, фикстуры в `test/fixtures/metacritic/`)
 
-- Все страницы — SSR (Nuxt), отдаются анонимным GET без Cloudflare-блока.
-  Браузер не нужен.
-- `/game/` — блок **New Releases** ровно 20 игр, отделён от Upcoming.
-- `/browse/game/all/all/all-time/new/` — 24/страница, ~7400 страниц,
-  `?page=N`. Поток сырой: мобильный шлак, большинство без скоров. **Описания в
-  списке битые** (сдвинуты между соседями) — описание брать только с карточки.
-  Порядок при равных датах нестабилен — дедуп по slug.
-- Карточка `/game/<slug>/`: title, developer, publisher, genres, description,
-  release date, блок All Platforms с Metascore по платформам. Userscore по
-  платформе — `?platform=<slug>`. На карточке лишь сэмпл отзывов; полные списки
-  `/critic-reviews/?platform=…`, `/user-reviews/?platform=…`.
-- **Видео**: если у игры есть трейлер, обложка — `cdn.jwplayer.com/v2/media/<ID>/poster.jpg`;
-  `https://cdn.jwplayer.com/v2/media/<ID>` отдаёт JSON плейлиста с mp4.
-  Ссылка на видео = этот ID. Иначе обложка — `metacritic.com/a/img/...`, видео нет.
-- Критики: издание, дата, платформа, цитата 1–3 предложения, ссылка на
-  оригинал, оценка 0–100. Пользователи: ник, полный текст, любой язык,
-  оценка 0–10, флаг spoiler. Sentiment (positive/mixed/negative) Metacritic
-  отдаёт сам.
-- JSON-бэкенд `backend.metacritic.com` (используется фронтом и проектом
-  mcp-metacritic, без учётки; `apiKey` зашит в клиентский бандл). Маршруты —
-  **сверить в DevTools на шаге разведки**, по памяти:
-  `/finder/metacritic/web?…sortBy=-releaseDate&offset&limit`,
-  `/composer/metacritic/pages/games/<slug>/web`,
-  `/reviews/metacritic/critic/games/<slug>/web`, `…/user/…` (offset/limit).
-  Возможно, reviews отдаёт ограниченную выборку — проверить. Первичный путь —
-  JSON, HTML — фолбэк и фикстуры.
+Все страницы — SSR (Nuxt 3), отдаются анонимным GET без Cloudflare-блока;
+браузер не нужен. Но HTML парсить не требуется: под ним лежит открытый
+JSON-бэкенд `backend.metacritic.com`, и весь сбор идёт через него.
+
+**apiKey не нужен.** В бандле он есть (`1MOZgmNFxvmljaQR1X9KAij9Mo4xAY3u`) и
+часть навигационных запросов его несут, но нужные проекту маршруты отвечают
+200 и без него. Ключ не хранить и не отправлять.
+
+Параметры `componentName` / `componentType` обязательного смысла не имеют —
+сервер отражает их в `meta` ответа и на данные не влияет.
+
+#### Списки: один маршрут на оба пункта ТЗ
+
+`GET /finder/metacritic/web` с `mcoTypeId=13` (13 = игра) и
+`sortBy=-releaseDate` покрывает обе выборки — различаются только параметры:
+
+| ТЗ | Параметры | Итог |
+|---|---|---|
+| п.1 New Releases | `metaScoreMin=1&offset=0&limit=20` | Ровно 20 игр блока New Releases, `totalResults` 18 524 |
+| п.2 SEE ALL / browse | без `metaScoreMin`, `limit=24&offset=(N-1)*24` | `totalResults` 177 945 ≈ 7414 страниц |
+
+Эквивалентность п.1 проверена сверкой с SSR-payload `__NUXT_DATA__` страницы
+`/game/`: карусель New Releases — тот же список из 20 элементов в том же
+порядке. **`metaScoreMin=1` и есть то, что отличает New Releases от browse:**
+блок показывает только игры с Metascore.
+
+Элемент списка даёт `slug`, `title`, `releaseDate`, `rating` (ESRB),
+`image.bucketType`+`bucketPath`, `criticScoreSummary`, `genres`, `description`,
+`userScore`. Разработчика, платформ и видео в списке нет — только на карточке.
+
+Порядок внутри одной календарной даты нестабилен: два запроса того же offset
+дают тот же набор в разном порядке. Дедуп по `slug` обязателен, пагинация по
+`offset` не гарантирует непересекающиеся страницы.
+
+#### Карточка
+
+`GET /games/metacritic/<slug>/web` → `data.item`:
+
+- `title`, `slug`, `description`, `releaseDate`, `rating`, `genres[].name`;
+- `production.companies[]` — разработчик и издатель различаются по
+  `typeName` (`Developer` / `Publisher`), одна компания может быть обеими;
+- `platforms[]` — по элементу на платформу: `name`, `slug`,
+  `criticScoreSummary.score` (Metascore 0–100), `reviewCount`,
+  `isLeadPlatform`, `relatedGameId`;
+- `video` — `jwPlayerId`, `embedUrl`, `manifestUrl`, `title`, `duration`.
+  Ссылку на видео **брать отсюда**, не реконструировать из обложки;
+- `images[]` — `typeName` `mainImage` / `cardImage`, плюс `bucketType` и
+  `bucketPath`.
+
+**Userscore на карточке нет.** `platforms[]` несёт только оценку критиков.
+
+#### Обложка
+
+URL собирается как `https://www.metacritic.com/a/img/` + `bucketType` +
+`bucketPath` — например `.../a/img/catalog/provider/7/2/7-1781631527.jpg`.
+Отдаётся оригинал (сотни КБ); параметры вроде `?width=` на этом пути
+игнорируются. Форма `/a/img/resize/<hash>/…`, которую использует сайт,
+подписана хешем под конкретный размер и из наших данных не собирается.
+
+#### Отзывы и оценки
+
+Оба вида — по одному шаблону, `<kind>` ∈ `critic` | `user`:
+
+```
+/reviews/metacritic/<kind>/games/<slug>/stats/web                    сводная оценка
+/reviews/metacritic/<kind>/games/<slug>/platform/<platform>/stats/web  то же по платформе
+/reviews/metacritic/<kind>/games/<slug>/web                          список (ведущая платформа)
+/reviews/metacritic/<kind>/games/<slug>/platform/<platform>/web      список по платформе
+```
+
+Список принимает `offset`, `limit`, `sort` (`date` | `score`) и
+`filterBySentiment` (`all` | `positive` | `neutral` | `negative`).
+**`filterBySentiment` закрывает сбалансированную выборку по тональности из §4.1
+на стороне источника** — считать sentiment самим не нужно.
+
+Существенные особенности:
+
+- **Userscore берётся только через `/platform/<slug>/stats/web`.** Сегмент пути
+  работает, а одноимённый query-параметр молча игнорируется: без сегмента
+  всегда возвращается ведущая платформа. У Onimusha PS5 8.8, PC 9.3 —
+  разница реальная, поэтому по каждой платформе нужен свой запрос.
+- **Список критиков жёстко отдаёт 10 элементов за запрос**, `limit` игнорируется
+  (`limit=50` и `limit=100` дают те же 10). `offset` работает корректно.
+  93 отзыва = 10 запросов. Список пользователей `limit` соблюдает
+  (проверено до 100).
+- **У отзыва критика нет поля `id`** — есть `publicationName`, `publicationSlug`,
+  `url`, `date`, `score` 0–100, `quote`. `external_id` схемы для критиков
+  придётся выводить детерминированно (кандидат — `publicationSlug` + `url`).
+  У отзыва пользователя `id` есть — UUID; плюс `author`, `score` 0–10,
+  `quote`, `date`, `spoiler`.
+- `reviewCount` в `stats` считает оценки, а не тексты: у Onimusha на PC
+  `reviewCount` 18, а текстовых отзывов в списке 8. Как вход правила обновления
+  резюме (§4.1) надёжнее длина сохранённого списка, а не `reviewCount`.
+- Отсутствие отзывов — не ошибка: `totalResults` 0, `items` `[]`, HTTP 200.
+
+#### Поток browse
+
+Большинство игр browse — мобильный и инди-шлак: без Metascore, часто **без
+описания** (`description: null`) и без видео. Эмбеддинг (§4.2) обязан работать
+при пустом описании — иначе такие игры выпадут из «похожих».
 
 ### YouTube
 
