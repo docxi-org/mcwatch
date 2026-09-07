@@ -67,6 +67,35 @@ const fetchTranscript = fetchTranscriptRaw as unknown as (
   videoId: string,
 ) => Promise<TranscriptSegment[]>;
 
+/**
+ * Субтитры приходят с HTML-мнемониками: `it&#39;s` вместо `it's`. Раньше они
+ * уезжали в модель как есть — увидели это в карточке конвейера 07.09.2026,
+ * глядя на сырьё судьи. Модель такое переживает, но кормить её мусором,
+ * который мы умеем убрать, незачем.
+ */
+export function decodeEntities(text: string): string {
+  const NAMED: Record<string, string> = {
+    amp: '&',
+    lt: '<',
+    gt: '>',
+    quot: '"',
+    apos: "'",
+    nbsp: ' ',
+  };
+
+  return text.replace(/&(#x?[0-9a-fA-F]+|[a-zA-Z]+);/g, (whole, body: string) => {
+    if (body.startsWith('#x') || body.startsWith('#X')) {
+      const code = Number.parseInt(body.slice(2), 16);
+      return Number.isNaN(code) ? whole : String.fromCodePoint(code);
+    }
+    if (body.startsWith('#')) {
+      const code = Number.parseInt(body.slice(1), 10);
+      return Number.isNaN(code) ? whole : String.fromCodePoint(code);
+    }
+    return NAMED[body.toLowerCase()] ?? whole;
+  });
+}
+
 function errorText(err: unknown): string {
   return err instanceof Error ? err.message : String(err);
 }
@@ -144,11 +173,13 @@ export class YouTubeClient {
       throw new TranscriptUnavailableError(videoId, errorText(err).slice(0, 120));
     });
 
-    const text = segments
-      .map((seg) => seg.text)
-      .join(' ')
-      .replace(/\s+/g, ' ')
-      .trim();
+    const text = decodeEntities(
+      segments
+        .map((seg) => seg.text)
+        .join(' ')
+        .replace(/\s+/g, ' ')
+        .trim(),
+    );
 
     // Пустая расшифровка при формально успешном ответе — это «No Commentary»
     // либо отпор источника. Констатация формы, а не суждение о смысле.

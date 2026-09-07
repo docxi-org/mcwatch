@@ -11,6 +11,7 @@ import {
   stampText,
   viewsText,
 } from '../web/src/lib/format.js';
+import { jsonTokens } from '../web/src/lib/jsonTokens.js';
 
 const NOW = Date.parse('2026-09-07T12:00:00.000Z');
 
@@ -105,5 +106,44 @@ describe('счётчик «проверено»', () => {
   it('обычное число показывается как есть', () => {
     expect(checkedCounterText(33, 0)).toBe('33');
     expect(checkedCounterText(5, 5)).toBe('5');
+  });
+});
+
+describe('подсветка JSON', () => {
+  it('ключ отличается от строкового значения', () => {
+    const toks = jsonTokens('{"игра":"Онимуся"}');
+
+    expect(toks.map((t) => [t.text, t.kind])).toEqual([
+      ['{', 'punct'],
+      ['"игра"', 'key'],
+      [':', 'punct'],
+      ['"Онимуся"', 'string'],
+      ['}', 'punct'],
+    ]);
+  });
+
+  it('числа, литералы и знаки различаются', () => {
+    const kinds = jsonTokens('[1, -2.5e3, true, null]').map((t) => t.kind);
+
+    expect(kinds).toContain('number');
+    expect(kinds).toContain('literal');
+    expect(kinds).toContain('punct');
+  });
+
+  it('текст восстанавливается из кусочков без потерь', () => {
+    // Отступы и порядок ключей должны остаться ровно те, что дал stringify.
+    const src = JSON.stringify({ a: [1, { b: 'два' }], c: null }, null, 2);
+
+    expect(jsonTokens(src).map((t) => t.text).join('')).toBe(src);
+  });
+
+  it('двоеточие внутри строки ключом её не делает', () => {
+    const toks = jsonTokens('{"a":"перед: после"}');
+
+    expect(toks.find((t) => t.text === '"перед: после"')?.kind).toBe('string');
+  });
+
+  it('пустой текст даёт пустой разбор', () => {
+    expect(jsonTokens('')).toEqual([]);
   });
 });

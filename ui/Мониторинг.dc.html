@@ -185,7 +185,7 @@
                   </sc-if>
                 </div>
                 <sc-if value="{{ e.open }}">
-                  <pre class="noscroll" style="margin: 0 14px 13px; padding: 12px 13px; background: #101013; border: 1px solid #232328; border-radius: 8px; font-family: 'JetBrains Mono', monospace; font-size: 11px; line-height: 1.6; color: #a9c7d1; overflow-x: auto">{{ e.dataText }}</pre>
+                  <div class="noscroll" style="margin: 0 14px 13px; padding: 12px 13px; background: #101013; border: 1px solid #232328; border-radius: 8px; font-family: 'JetBrains Mono', monospace; font-size: 11px; line-height: 1.6; overflow-x: auto; white-space: pre-wrap; word-break: break-word"><sc-for list="{{ e.dataToks }}" as="tk" hint-placeholder-count="6"><span style="color: {{ tk.c }}">{{ tk.t }}</span></sc-for></div>
                 </sc-if>
               </div>
             </sc-for>
@@ -295,6 +295,24 @@ class Component extends DCLogic {
     return out;
   }
 
+  jsonToks(text) {
+    const KEY = '#79a9b8', STR = 'oklch(0.78 0.15 145)', NUM = 'oklch(0.84 0.15 92)', LIT = 'oklch(0.76 0.14 300)', PUN = '#5f5f67', PLAIN = '#c8c9cf';
+    const RX = /("(?:\\.|[^"\\])*")(\s*:)?|(-?\d+(?:\.\d+)?(?:[eE][+-]?\d+)?)|\b(true|false|null)\b|([{}\[\],:])/g;
+    const src = text || '';
+    const toks = [];
+    let m, last = 0;
+    while ((m = RX.exec(src)) !== null) {
+      if (m.index > last) toks.push({ t: src.slice(last, m.index), c: PLAIN });
+      if (m[1]) { toks.push({ t: m[1], c: m[2] ? KEY : STR }); if (m[2]) toks.push({ t: m[2], c: PUN }); }
+      else if (m[3]) toks.push({ t: m[3], c: NUM });
+      else if (m[4]) toks.push({ t: m[4], c: LIT });
+      else toks.push({ t: m[5], c: PUN });
+      last = RX.lastIndex;
+    }
+    if (last < src.length) toks.push({ t: src.slice(last), c: PLAIN });
+    return toks.map((x, i) => ({ id: String(i), t: x.t, c: x.c }));
+  }
+
   scenarioList() {
     return [
       { id: 'running', name: 'Цикл идёт — поток живой' },
@@ -397,7 +415,7 @@ class Component extends DCLogic {
       levelFg: e.level === 'error' ? 'oklch(0.75 0.16 25)' : (e.level === 'warn' ? MIXED : '#9a9ba3'),
       hasData: !!e.data, open: openIds.indexOf(e.id) >= 0,
       toggleText: openIds.indexOf(e.id) >= 0 ? 'скрыть data' : 'data',
-      dataText: e.data ? JSON.stringify(e.data, null, 2) : '',
+      dataToks: this.jsonToks(e.data ? JSON.stringify(e.data, null, 2) : ''),
       toggle: () => this.setState(st => ({ openIds: st.openIds.indexOf(e.id) >= 0 ? st.openIds.filter(x => x !== e.id) : st.openIds.concat([e.id]) }))
     }));
 

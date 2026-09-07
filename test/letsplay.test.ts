@@ -404,3 +404,21 @@ describe('раскладка исходов', () => {
     });
   });
 });
+
+describe('расшифровка', () => {
+  it('HTML-мнемоники раскрываются: в модель не должен уезжать мусор', async () => {
+    const { decodeEntities } = await import('../src/clients/youtube.js');
+
+    // Ровно то, что показала карточка конвейера в сырье судьи.
+    expect(decodeEntities('it&#39;s been quite a long time')).toBe("it's been quite a long time");
+    expect(decodeEntities('Tom &amp; Jerry &quot;лучшие&quot;')).toBe('Tom & Jerry "лучшие"');
+    expect(decodeEntities('&#x27;шестнадцатеричная&#x27;')).toBe("'шестнадцатеричная'");
+  });
+
+  it('незнакомую мнемонику оставляет как есть, а не съедает', () => {
+    // Молча удалить кусок текста хуже, чем оставить его непонятным.
+    return import('../src/clients/youtube.js').then(({ decodeEntities }) => {
+      expect(decodeEntities('&неведомое; и &#не-число;')).toBe('&неведомое; и &#не-число;');
+    });
+  });
+});

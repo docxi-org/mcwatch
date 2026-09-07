@@ -292,6 +292,10 @@
                 </div>
               </div>
               <span style="font-family: 'JetBrains Mono', monospace; font-size: 10px; color: #5f5f67">лучшие значения среди платформ · по каждой платформе оценки свои</span>
+
+              <button onClick="{{ openPipe }}" style="align-self: flex-start; margin-top: 6px; cursor: pointer; display: flex; align-items: center; gap: 9px; min-height: 44px; padding: 0 16px; border-radius: 9px; border: 1px solid #35353d; background: #1c1c21; color: #edeef0; font-size: 13.5px" style-hover="border-color: oklch(0.78 0.13 205)">
+                <span style="font-family: 'JetBrains Mono', monospace; font-size: 10px; letter-spacing: 0.06em; color: oklch(0.78 0.13 205)">LLM</span>Как это собрано
+              </button>
             </div>
 
             <div style="display: flex; flex-direction: column; gap: 10px">
@@ -461,6 +465,276 @@
 
   </div>
 
+  <sc-if value="{{ pipe.show }}">
+    <div onClick="{{ pipe.close }}" style="position: fixed; inset: 0; z-index: 90; display: grid; place-items: center; padding: {{ pipe.dialogPad }}; background: rgba(8,8,9,0.88)">
+      <div onClick="{{ pipe.stop }}" role="dialog" aria-modal="true" aria-label="Конвейер сборки игры" style="display: flex; flex-direction: column; width: 100%; max-width: 1020px; height: {{ pipe.dialogH }}; background: #101013; border: 1px solid #2a2a30; border-radius: {{ pipe.dialogRadius }}; overflow: hidden">
+
+        <div style="flex: none; display: flex; align-items: flex-start; justify-content: space-between; gap: 14px; padding: 18px 20px; border-bottom: 1px solid #232328; background: #141417">
+          <span style="display: flex; flex-direction: column; gap: 5px; min-width: 0">
+            <span style="font-family: 'JetBrains Mono', monospace; font-size: 9.5px; letter-spacing: 0.07em; color: #74747c">КОНВЕЙЕР СБОРКИ</span>
+            <span style="font-size: 18px; font-weight: 700; letter-spacing: -0.02em; line-height: 1.25; text-wrap: pretty">{{ pipe.title }}</span>
+          </span>
+          <button onClick="{{ pipe.close }}" aria-label="Закрыть конвейер" style="flex: none; cursor: pointer; min-height: 34px; border: 1px solid #35353d; background: #1c1c21; color: #c6c7cd; border-radius: 7px; padding: 0 11px; font-family: 'JetBrains Mono', monospace; font-size: 11px" style-hover="border-color: oklch(0.78 0.13 205)">закрыть · Esc</button>
+        </div>
+
+        <div class="noscroll" style="flex: 1 1 auto; overflow-y: auto; padding: 20px; display: flex; flex-direction: column; gap: 26px">
+
+          <sc-if value="{{ pipe.loadingModule }}">
+            <span style="font-family: 'JetBrains Mono', monospace; font-size: 11px; color: #6f6f77">запрашиваем оглавление конвейера…</span>
+          </sc-if>
+
+          <sc-if value="{{ pipe.isError }}">
+            <div style="display: flex; flex-direction: column; align-items: flex-start; gap: 13px; padding: 40px 8px">
+              <span style="font-family: 'JetBrains Mono', monospace; font-size: 44px; font-weight: 700; line-height: 1; color: #2f2f36">{{ pipe.err.code }}</span>
+              <span style="font-size: 18px; font-weight: 700; letter-spacing: -0.02em">Записей по этому адресу нет</span>
+              <span style="font-size: 14px; color: #8b8b93; line-height: 1.6; max-width: 56ch; text-wrap: pretty">{{ pipe.err.text }}</span>
+              <span style="font-family: 'JetBrains Mono', monospace; font-size: 10.5px; color: #5f5f67; margin-top: 6px; padding: 8px 11px; background: #131316; border: 1px solid #232328; border-radius: 7px; word-break: break-all">{{ pipe.err.tech }}</span>
+            </div>
+          </sc-if>
+
+          <sc-if value="{{ pipe.notRecorded }}">
+            <div style="display: flex; flex-direction: column; gap: 10px; padding: 34px 22px; border: 1px dashed #2c2c33; border-radius: 11px">
+              <span style="font-size: 16px; font-weight: 600">По этой игре записей нет</span>
+              <span style="font-size: 13.5px; color: #8b8b93; line-height: 1.6; max-width: 60ch; text-wrap: pretty">{{ pipe.noneNote }}</span>
+            </div>
+          </sc-if>
+
+          <sc-if value="{{ pipe.recorded }}" hint-placeholder-val="{{ true }}">
+            <div style="display: flex; flex-direction: column; gap: 20px">
+              <div style="display: flex; flex-direction: column; gap: 9px">
+                <div style="display: grid; grid-template-columns: {{ pipe.totalCols }}; gap: 1px; border: 1px solid #232328; border-radius: 10px; overflow: hidden">
+                  <sc-for list="{{ pipe.totals }}" as="t" hint-placeholder-count="6">
+                    <div style="display: flex; flex-direction: column; gap: 5px; padding: 13px 14px; background: #141417">
+                      <span style="font-family: 'JetBrains Mono', monospace; font-size: 9px; letter-spacing: 0.05em; color: #74747c">{{ t.k }}</span>
+                      <span style="font-family: 'JetBrains Mono', monospace; font-size: 18px; font-weight: 700; line-height: 1; color: {{ t.fg }}">{{ t.v }}</span>
+                      <span style="font-family: 'JetBrains Mono', monospace; font-size: 9.5px; color: #6f6f77">{{ t.note }}</span>
+                    </div>
+                  </sc-for>
+                </div>
+                <span style="font-size: 12px; color: #6f6f77; line-height: 1.5">{{ pipe.costNote }}</span>
+              </div>
+
+              <div style="display: flex; flex-direction: column; gap: 9px">
+                <span style="font-family: 'JetBrains Mono', monospace; font-size: 9.5px; letter-spacing: 0.06em; color: #74747c">ЭТАПЫ В ПОРЯДКЕ ВЫПОЛНЕНИЯ</span>
+                <div style="display: flex; flex-direction: column; gap: 8px">
+                  <sc-for list="{{ pipe.stages }}" as="st" hint-placeholder-count="8">
+                    <div style="border: 1px solid #232328; border-radius: 10px; overflow: hidden; background: {{ st.rowBg }}">
+                      <div onClick="{{ st.toggle }}" onKeyDown="{{ st.keyHandler }}" role="button" tabIndex="0" aria-expanded="{{ st.open }}" aria-label="{{ st.aria }}" style="cursor: pointer; display: flex; align-items: flex-start; gap: 12px; padding: 13px 15px" style-hover="background: #191a1e">
+                        <span style="flex: none; font-family: 'JetBrains Mono', monospace; font-size: 9.5px; color: #5f5f67; padding-top: 3px; width: 34px">{{ st.num }}</span>
+                        <span style="display: flex; flex-direction: column; gap: 6px; min-width: 0; flex: 1 1 auto">
+                          <span style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap">
+                            <span style="font-size: 14.5px; font-weight: 600">{{ st.title }}</span>
+                            <span style="font-family: 'JetBrains Mono', monospace; font-size: 8.5px; letter-spacing: 0.06em; padding: 3px 6px; border-radius: 4px; background: {{ st.kindBg }}; color: {{ st.kindFg }}">{{ st.kindText }}</span>
+                            <span style="font-family: 'JetBrains Mono', monospace; font-size: 8.5px; letter-spacing: 0.06em; padding: 3px 6px; border-radius: 4px; background: {{ st.statusBg }}; color: {{ st.statusFg }}">{{ st.statusText }}</span>
+                          </span>
+                          <span style="font-size: 12.5px; color: #a9aab1; line-height: 1.5; text-wrap: pretty">{{ st.summary }}</span>
+                        </span>
+                        <span style="flex: none; font-family: 'JetBrains Mono', monospace; font-size: 15px; color: #6f6f77; padding-top: 1px">{{ st.chevron }}</span>
+                      </div>
+
+                      <sc-if value="{{ st.isSkipped }}">
+                        <div style="padding: 0 15px 15px 61px">
+                          <div style="padding: 12px 14px; border: 1px dashed #2c2c33; border-radius: 8px">
+                            <span style="font-size: 13px; color: #8b8b93; line-height: 1.55">Вызова не было: {{ st.skipNote }}. Пропуск — не ошибка, дальше конвейер пошёл как обычно.</span>
+                          </div>
+                        </div>
+                      </sc-if>
+
+                      <sc-if value="{{ st.isCode }}">
+                        <div style="padding: 0 15px 15px 61px; display: flex; flex-direction: column; gap: 9px">
+                          <span style="font-family: 'JetBrains Mono', monospace; font-size: 9px; letter-spacing: 0.06em; color: #74747c">ЧТО ПРОИЗОШЛО · БЕЗ МОДЕЛИ</span>
+                          <div style="display: flex; flex-direction: column; gap: 1px; border: 1px solid #232328; border-radius: 8px; overflow: hidden">
+                            <sc-for list="{{ st.facts }}" as="f" hint-placeholder-count="4">
+                              <div style="display: flex; gap: 12px; flex-wrap: wrap; justify-content: space-between; padding: 9px 12px; background: #141417">
+                                <span style="font-family: 'JetBrains Mono', monospace; font-size: 10.5px; color: #85858d">{{ f.key }}</span>
+                                <span style="font-size: 12.5px; color: #d5d6db; text-align: right; min-width: 0">{{ f.value }}</span>
+                              </div>
+                            </sc-for>
+                          </div>
+                        </div>
+                      </sc-if>
+
+                      <sc-if value="{{ st.isLlm }}">
+                        <div style="padding: 0 15px 16px 61px; display: flex; flex-direction: column; gap: 16px">
+
+                          <sc-if value="{{ st.showTabs }}">
+                            <div style="display: flex; flex-direction: column; gap: 7px">
+                              <span style="font-family: 'JetBrains Mono', monospace; font-size: 9px; letter-spacing: 0.06em; color: #74747c">{{ st.tabsNote }}</span>
+                              <div class="noscroll" role="group" aria-label="Вызовы этапа" style="display: flex; gap: 6px; overflow-x: auto; padding-bottom: 3px">
+                                <sc-for list="{{ st.runTabs }}" as="r" hint-placeholder-count="2">
+                                  <button onClick="{{ r.pick }}" style="flex: none; cursor: pointer; min-height: 30px; padding: 0 11px; border-radius: 7px; font-family: 'JetBrains Mono', monospace; font-size: 10.5px; border: 1px solid {{ r.bc }}; background: {{ r.bg }}; color: {{ r.fg }}">{{ r.label }}</button>
+                                </sc-for>
+                              </div>
+                            </div>
+                          </sc-if>
+
+                          <sc-if value="{{ st.loading }}">
+                            <div style="display: flex; flex-direction: column; gap: 9px; padding: 16px 0">
+                              <span style="font-family: 'JetBrains Mono', monospace; font-size: 10px; color: #6f6f77">GET /pipeline/runs/… — запрашиваем сырьё этого вызова</span>
+                              <span style="height: 10px; width: 70%; border-radius: 4px; background: #1e1e23"></span>
+                              <span style="height: 10px; width: 90%; border-radius: 4px; background: #1a1a1e"></span>
+                              <span style="height: 10px; width: 55%; border-radius: 4px; background: #1a1a1e"></span>
+                            </div>
+                          </sc-if>
+
+                          <sc-if value="{{ st.detReady }}">
+                            <div style="display: flex; flex-direction: column; gap: 16px">
+
+                              <div style="display: flex; flex-direction: column; gap: 9px">
+                                <span style="font-family: 'JetBrains Mono', monospace; font-size: 9px; letter-spacing: 0.06em; color: #74747c">СЫРЬЁ · ЧТО УШЛО В МОДЕЛЬ</span>
+                                <sc-if value="{{ st.hasSystem }}">
+                                  <div style="display: flex; flex-direction: column; gap: 6px">
+                                    <span style="display: flex; justify-content: space-between; gap: 10px; font-family: 'JetBrains Mono', monospace; font-size: 9.5px; color: #85858d">
+                                      <span>ПОСТОЯННАЯ ЧАСТЬ · ОДИНАКОВА ДЛЯ ВСЕХ ИГР</span><span>{{ st.systemChars }}</span>
+                                    </span>
+                                    <pre class="noscroll" style="margin: 0; max-height: 150px; overflow: auto; padding: 11px 12px; background: #0c0c0d; border: 1px solid #232328; border-radius: 8px; font-family: 'JetBrains Mono', monospace; font-size: 11px; line-height: 1.65; color: #9aa7ab; white-space: pre-wrap; word-break: break-word">{{ st.system }}</pre>
+                                  </div>
+                                </sc-if>
+                                <sc-if value="{{ st.showNoSystem }}">
+                                  <span style="font-size: 12.5px; color: #6f6f77; line-height: 1.5">{{ st.noSystemNote }}</span>
+                                </sc-if>
+                                <div style="display: flex; flex-direction: column; gap: 6px">
+                                  <span style="display: flex; justify-content: space-between; gap: 10px; font-family: 'JetBrains Mono', monospace; font-size: 9.5px; color: #85858d">
+                                    <span>ПЕРЕМЕННАЯ ЧАСТЬ · ДАННЫЕ ЭТОЙ ИГРЫ</span><span>{{ st.promptChars }}</span>
+                                  </span>
+
+                                  <sc-if value="{{ st.canSearch }}">
+                                    <div style="display: flex; gap: 7px; flex-wrap: wrap; align-items: center">
+                                      <input value="{{ st.query }}" onInput="{{ st.setQuery }}" type="search" aria-label="Поиск по сырью вызова" placeholder="поиск по сырью" style="flex: 1 1 180px; min-width: 0; box-sizing: border-box; background: #0c0c0d; border: 1px solid #2a2a30; border-radius: 7px; padding: 8px 11px; color: #edeef0; font-family: 'JetBrains Mono', monospace; font-size: 11px; outline: none" style-focus="border-color: oklch(0.78 0.13 205)">
+                                      <sc-if value="{{ st.canCollapse }}">
+                                        <button onClick="{{ st.toggleCollapse }}" style="flex: none; cursor: pointer; min-height: 32px; padding: 0 11px; border-radius: 7px; border: 1px solid #33333a; background: #1c1c21; color: #a9aab1; font-family: 'JetBrains Mono', monospace; font-size: 10.5px" style-hover="border-color: oklch(0.78 0.13 205)">{{ st.collapseLabel }}</button>
+                                      </sc-if>
+                                    </div>
+                                  </sc-if>
+
+                                  <sc-if value="{{ st.showRawText }}" hint-placeholder-val="{{ true }}">
+                                    <div style="display: flex; flex-direction: column; gap: 5px">
+                                      <pre class="noscroll" style="margin: 0; max-height: 240px; overflow: auto; padding: 11px 12px; background: #0c0c0d; border: 1px solid #232328; border-radius: 8px; font-family: 'JetBrains Mono', monospace; font-size: 11px; line-height: 1.65; color: #a9c7d1; white-space: pre-wrap; word-break: break-word">{{ st.prompt }}</pre>
+                                      <span style="font-family: 'JetBrains Mono', monospace; font-size: 9.5px; color: #5f5f67">{{ st.collapseNote }}</span>
+                                    </div>
+                                  </sc-if>
+
+                                  <sc-if value="{{ st.hasHits }}">
+                                    <div style="display: flex; flex-direction: column; gap: 5px">
+                                      <span style="font-family: 'JetBrains Mono', monospace; font-size: 9.5px; color: #79a9b8">{{ st.hitsNote }}</span>
+                                      <div class="noscroll" style="max-height: 240px; overflow: auto; display: flex; flex-direction: column; gap: 1px; border: 1px solid #232328; border-radius: 8px; overflow-x: hidden">
+                                        <sc-for list="{{ st.hits }}" as="h" hint-placeholder-count="3">
+                                          <span style="display: flex; gap: 10px; padding: 8px 11px; background: #0c0c0d; font-family: 'JetBrains Mono', monospace; font-size: 11px; line-height: 1.6; color: #a9c7d1">
+                                            <span style="flex: none; color: #5f5f67; min-width: 34px; text-align: right">{{ h.num }}</span>
+                                            <span style="min-width: 0; word-break: break-word">{{ h.text }}</span>
+                                          </span>
+                                        </sc-for>
+                                      </div>
+                                    </div>
+                                  </sc-if>
+
+                                  <sc-if value="{{ st.noHits }}">
+                                    <span style="font-family: 'JetBrains Mono', monospace; font-size: 11px; color: #6f6f77; padding: 11px 12px; border: 1px dashed #2c2c33; border-radius: 8px">В сырье этого вызова совпадений нет.</span>
+                                  </sc-if>
+                                </div>
+                              </div>
+
+                              <div style="display: flex; flex-direction: column; gap: 9px">
+                                <span style="font-family: 'JetBrains Mono', monospace; font-size: 9px; letter-spacing: 0.06em; color: #74747c">РАБОТА МОДЕЛИ · {{ st.run.statusText }}</span>
+                                <div style="display: grid; grid-template-columns: {{ pipe.metricCols }}; gap: 1px; border: 1px solid #232328; border-radius: 8px; overflow: hidden">
+                                  <div style="display: flex; flex-direction: column; gap: 4px; padding: 10px 12px; background: #141417">
+                                    <span style="font-family: 'JetBrains Mono', monospace; font-size: 8.5px; letter-spacing: 0.05em; color: #74747c">МОДЕЛЬ</span>
+                                    <span style="font-family: 'JetBrains Mono', monospace; font-size: 12px; color: #edeef0; word-break: break-all">{{ st.run.model }}</span>
+                                  </div>
+                                  <div style="display: flex; flex-direction: column; gap: 4px; padding: 10px 12px; background: #141417">
+                                    <span style="font-family: 'JetBrains Mono', monospace; font-size: 8.5px; letter-spacing: 0.05em; color: #74747c">ПОПЫТОК</span>
+                                    <span style="font-family: 'JetBrains Mono', monospace; font-size: 14px; font-weight: 700; color: #edeef0">{{ st.run.attempts }}</span>
+                                    <span style="font-family: 'JetBrains Mono', monospace; font-size: 9px; color: #6f6f77">{{ st.run.attemptsNote }}</span>
+                                  </div>
+                                  <div style="display: flex; flex-direction: column; gap: 4px; padding: 10px 12px; background: #141417">
+                                    <span style="font-family: 'JetBrains Mono', monospace; font-size: 8.5px; letter-spacing: 0.05em; color: #74747c">ДЛИТЕЛЬНОСТЬ</span>
+                                    <span style="font-family: 'JetBrains Mono', monospace; font-size: 14px; font-weight: 700; color: #edeef0">{{ st.run.duration }}</span>
+                                  </div>
+                                  <div style="display: flex; flex-direction: column; gap: 4px; padding: 10px 12px; background: #141417">
+                                    <span style="font-family: 'JetBrains Mono', monospace; font-size: 8.5px; letter-spacing: 0.05em; color: #74747c">ТОКЕНОВ НА ВХОДЕ</span>
+                                    <span style="font-family: 'JetBrains Mono', monospace; font-size: 14px; font-weight: 700; color: #edeef0">{{ st.run.promptTokens }}</span>
+                                  </div>
+                                  <div style="display: flex; flex-direction: column; gap: 4px; padding: 10px 12px; background: #141417">
+                                    <span style="font-family: 'JetBrains Mono', monospace; font-size: 8.5px; letter-spacing: 0.05em; color: #74747c">ТОКЕНОВ НА ВЫХОДЕ</span>
+                                    <span style="font-family: 'JetBrains Mono', monospace; font-size: 14px; font-weight: 700; color: #edeef0">{{ st.run.completionTokens }}</span>
+                                  </div>
+                                  <div style="display: flex; flex-direction: column; gap: 4px; padding: 10px 12px; background: #141417">
+                                    <span style="font-family: 'JetBrains Mono', monospace; font-size: 8.5px; letter-spacing: 0.05em; color: #74747c">СТОИМОСТЬ, ОЦЕНКА</span>
+                                    <span style="font-family: 'JetBrains Mono', monospace; font-size: 14px; font-weight: 700; color: #edeef0">{{ st.run.cost }}</span>
+                                  </div>
+                                </div>
+                                <sc-if value="{{ st.run.hasBatch }}">
+                                  <span style="font-size: 12.5px; color: #ddc9a3; line-height: 1.55; padding: 10px 12px; border-radius: 8px; background: rgba(190,150,40,0.07); border: 1px solid oklch(0.45 0.08 92)">{{ st.run.batchNote }}</span>
+                                </sc-if>
+                              </div>
+
+                              <div style="display: flex; flex-direction: column; gap: 9px">
+                                <span style="font-family: 'JetBrains Mono', monospace; font-size: 9px; letter-spacing: 0.06em; color: #74747c">РЕШЕНИЕ</span>
+                                <sc-if value="{{ st.hasOutput }}">
+                                  <div style="display: flex; flex-direction: column; gap: 6px">
+                                    <span style="font-family: 'JetBrains Mono', monospace; font-size: 9.5px; color: #85858d">ЧТО ВЕРНУЛА МОДЕЛЬ</span>
+                                    <div class="noscroll" style="max-height: 220px; overflow: auto; padding: 11px 12px; background: #0c0c0d; border: 1px solid #232328; border-radius: 8px; font-family: 'JetBrains Mono', monospace; font-size: 11px; line-height: 1.65; white-space: pre-wrap; word-break: break-word"><sc-for list="{{ st.outToks }}" as="tk" hint-placeholder-count="8"><span style="color: {{ tk.c }}">{{ tk.t }}</span></sc-for></div>
+                                  </div>
+                                </sc-if>
+                                <sc-if value="{{ st.noOutput }}">
+                                  <span style="font-size: 13px; color: #8b8b93; line-height: 1.55; padding: 11px 12px; border: 1px dashed #2c2c33; border-radius: 8px">Модель не вернула ответа — вызов сорвался, разбирать нечего.</span>
+                                </sc-if>
+                                <div style="display: flex; flex-direction: column; gap: 5px; padding: 11px 13px; border-radius: 8px; background: #17171b; border: 1px solid #2c2c33">
+                                  <span style="font-family: 'JetBrains Mono', monospace; font-size: 9px; letter-spacing: 0.06em; color: #74747c">ЧТО СДЕЛАЛ КОД</span>
+                                  <span style="font-size: 13.5px; color: #edeef0; line-height: 1.5">{{ st.run.decision }}</span>
+                                </div>
+                                <sc-if value="{{ st.run.hasError }}">
+                                  <div style="display: flex; flex-direction: column; gap: 5px; padding: 11px 13px; border-radius: 8px; background: rgba(180,60,40,0.09); border: 1px solid oklch(0.42 0.1 25)">
+                                    <span style="font-family: 'JetBrains Mono', monospace; font-size: 9px; letter-spacing: 0.06em; color: oklch(0.75 0.16 25)">ОШИБКА ВЫЗОВА</span>
+                                    <span style="font-size: 12.5px; color: #d8b6ae; line-height: 1.55; word-break: break-word">{{ st.run.error }}</span>
+                                  </div>
+                                </sc-if>
+                              </div>
+
+                            </div>
+                          </sc-if>
+                        </div>
+                      </sc-if>
+                    </div>
+                  </sc-for>
+                </div>
+              </div>
+
+              <sc-if value="{{ pipe.hasCandidates }}">
+                <div style="display: flex; flex-direction: column; gap: 10px">
+                  <div style="display: flex; align-items: baseline; justify-content: space-between; gap: 12px; flex-wrap: wrap">
+                    <span style="font-size: 15px; font-weight: 600">Кандидаты в летсплеи</span>
+                    <span style="font-family: 'JetBrains Mono', monospace; font-size: 9.5px; color: #6f6f77">{{ pipe.candidatesNote }}</span>
+                  </div>
+                  <div style="display: grid; grid-template-columns: {{ pipe.candCols }}; gap: 10px">
+                    <sc-for list="{{ pipe.candidates }}" as="c" hint-placeholder-count="5">
+                      <div style="display: flex; flex-direction: column; gap: 9px; padding: 13px 14px; background: #141417; border: 1px solid #232328; border-radius: 10px; border-left: 2px solid {{ c.accent }}">
+                        <span style="display: flex; align-items: baseline; gap: 8px; flex-wrap: wrap">
+                          <span style="font-family: 'JetBrains Mono', monospace; font-size: 10px; color: #5f5f67">{{ c.position }}</span>
+                          <span style="font-family: 'JetBrains Mono', monospace; font-size: 10px; color: #79a9b8">{{ c.videoId }}</span>
+                        </span>
+                        <span style="font-size: 13.5px; font-weight: 500; line-height: 1.4; text-wrap: pretty">{{ c.title }}</span>
+                        <span style="font-family: 'JetBrains Mono', monospace; font-size: 9.5px; color: #7d7d85; line-height: 1.6">{{ c.channel }} · {{ c.views }} · {{ c.duration }}<br>{{ c.chars }}</span>
+                        <span style="display: flex; flex-direction: column; gap: 4px; padding-top: 3px; border-top: 1px solid #232328">
+                          <span style="font-family: 'JetBrains Mono', monospace; font-size: 9.5px; color: #85858d; padding-top: 7px">ВЕРДИКТ СУДЬИ: {{ c.verdict }}<sc-if value="{{ c.hasConf }}"><span> · {{ c.conf }}</span></sc-if></span>
+                          <sc-if value="{{ c.hasReason }}">
+                            <span style="font-size: 12.5px; color: #a9aab1; line-height: 1.5; text-wrap: pretty">{{ c.reason }}</span>
+                          </sc-if>
+                          <span style="font-family: 'JetBrains Mono', monospace; font-size: 10px; color: {{ c.outFg }}; padding-top: 3px">ИТОГ: {{ c.outcome }}</span>
+                        </span>
+                      </div>
+                    </sc-for>
+                  </div>
+                </div>
+              </sc-if>
+            </div>
+          </sc-if>
+
+        </div>
+      </div>
+    </div>
+  </sc-if>
+
   <sc-if value="{{ videoOpen }}">
     <div onClick="{{ closeVideo }}" style="position: fixed; inset: 0; z-index: 100; display: grid; place-items: center; padding: 24px; background: rgba(8,8,9,0.86)">
       <div onClick="{{ stop }}" role="dialog" aria-modal="true" aria-label="Трейлер игры" style="display: flex; flex-direction: column; gap: 10px; width: 100%; max-width: 900px">
@@ -618,7 +892,9 @@ class Component extends DCLogic {
     route: 'list', slug: null, q: '', platform: null, sort: 'date',
     shown: PAGE, loading: false, initialLoading: false, emptyDb: false,
     vp: this.props.viewport || 'desktop',
-    scenario: 'list-full', videoOpen: false, errorCode: null, listScroll: 0, stale: false
+    scenario: 'list-full', videoOpen: false, errorCode: null, listScroll: 0, stale: false,
+    pipeOpen: false, pipeStage: null, pipeRun: 0, pipeDetail: {}, pipeLoading: false, pipeMod: null,
+    pipeError: null, pipeQuery: '', pipeExpanded: {}
   };
 
   key(fn) { return e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); fn(); } }; }
@@ -640,9 +916,245 @@ class Component extends DCLogic {
     requestAnimationFrame(() => { if (t && t.focus) t.focus(); });
   }
 
+  focusDialog() {
+    const grab = tries => requestAnimationFrame(() => {
+      const b = document.querySelector('[role="dialog"] button');
+      if (b) b.focus();
+      else if (tries > 0) grab(tries - 1);
+    });
+    grab(10);
+  }
+
+  showPipe() {
+    this.pipeTrigger = document.activeElement;
+    this.setState({ pipeOpen: true, pipeStage: null, pipeRun: 0, pipeError: null, pipeQuery: '' });
+    this.focusDialog();
+  }
+
+  hidePipe() {
+    const t = this.pipeTrigger;
+    this.setState({ pipeOpen: false, pipeStage: null });
+    requestAnimationFrame(() => { if (t && t.focus) t.focus(); });
+  }
+
+  toggleStage(st) {
+    if (this.state.pipeStage === st.key) { this.setState({ pipeStage: null }); return; }
+    this.setState({ pipeStage: st.key, pipeRun: 0, pipeQuery: '' });
+    if (st.runs.length) this.fetchRun(st.runs[0].id);
+  }
+
+  pickRun(st, i) {
+    this.setState({ pipeRun: i, pipeQuery: '' });
+    this.fetchRun(st.runs[i].id);
+  }
+
+  fetchRun(id) {
+    if (this.state.pipeDetail[id] || !this.state.pipeMod) return;
+    this.setState({ pipeLoading: true });
+    clearTimeout(this.rt);
+    this.rt = setTimeout(() => {
+      const d = this.state.pipeMod.runDetail(this.state.slug, id);
+      this.setState(s => ({ pipeLoading: false, pipeDetail: Object.assign({}, s.pipeDetail, { [id]: d || { missing: true } }) }));
+    }, 480);
+  }
+
+  nfmt(n) { return String(n).replace(/\B(?=(\d{3})+(?!\d))/g, ' '); }
+
+  dur(ms) {
+    if (ms < 1000) return ms + ' мс';
+    if (ms < 60000) return (ms / 1000).toFixed(1).replace('.', ',') + ' с';
+    const m = Math.floor(ms / 60000), s = Math.round((ms % 60000) / 1000);
+    return m + ' мин ' + s + ' с';
+  }
+
+  usd(v) { return '$' + v.toFixed(v < 0.001 ? 5 : 4); }
+
+  jsonToks(text) {
+    const KEY = '#79a9b8', STR = 'oklch(0.78 0.15 145)', NUM = 'oklch(0.84 0.15 92)', LIT = 'oklch(0.76 0.14 300)', PUN = '#5f5f67', PLAIN = '#c8c9cf';
+    const RX = /("(?:\\.|[^"\\])*")(\s*:)?|(-?\d+(?:\.\d+)?(?:[eE][+-]?\d+)?)|\b(true|false|null)\b|([{}\[\],:])/g;
+    const src = text || '';
+    const toks = [];
+    let m, last = 0;
+    while ((m = RX.exec(src)) !== null) {
+      if (m.index > last) toks.push({ t: src.slice(last, m.index), c: PLAIN });
+      if (m[1]) { toks.push({ t: m[1], c: m[2] ? KEY : STR }); if (m[2]) toks.push({ t: m[2], c: PUN }); }
+      else if (m[3]) toks.push({ t: m[3], c: NUM });
+      else if (m[4]) toks.push({ t: m[4], c: LIT });
+      else toks.push({ t: m[5], c: PUN });
+      last = RX.lastIndex;
+    }
+    if (last < src.length) toks.push({ t: src.slice(last), c: PLAIN });
+    return toks.map((x, i) => ({ id: String(i), t: x.t, c: x.c }));
+  }
+
+  pipeVM() {
+    const s = this.state;
+    const g = D.find(x => x.slug === s.slug) || D[0];
+    const empty = { show: false, stages: [], totals: [], candidates: [] };
+    const shell = {
+      dialogPad: s.vp === 'mobile' ? '0' : '24px',
+      dialogRadius: s.vp === 'mobile' ? '0' : '14px',
+      dialogH: s.vp === 'mobile' ? '100%' : 'min(88vh, 900px)',
+      close: () => this.hidePipe(), stop: e => e.stopPropagation()
+    };
+    if (s.pipeOpen && s.pipeError) return Object.assign(empty, shell, {
+      show: true, isError: true, title: 'Конвейер недоступен',
+      err: { code: '404', text: 'Записей конвейера по этому адресу нет: игры с таким slug в базе не найдено. Возможно, адрес устарел или в нём опечатка.', tech: 'GET /api/games/' + (s.slug || 'unknown') + '/pipeline → 404 {"error":"not_found"}' }
+    });
+    if (!s.pipeOpen || !s.pipeMod) return Object.assign(empty, shell, { show: s.pipeOpen, title: g.title, loadingModule: s.pipeOpen });
+    const p = s.pipeMod.pipeline(s.slug);
+    const st8 = { done: { t: 'СДЕЛАНО', bg: 'rgba(60,150,180,0.14)', fg: 'oklch(0.78 0.13 205)' },
+      skipped: { t: 'ПРОПУЩЕНО', bg: '#22232a', fg: '#9a9ba3' },
+      failed: { t: 'СОРВАЛОСЬ', bg: 'rgba(180,60,40,0.14)', fg: 'oklch(0.75 0.16 25)' } };
+
+    const stages = p.stages.map((st, i) => {
+      const open = s.pipeStage === st.key;
+      const pill = st8[st.status] || st8.skipped;
+      const idx = Math.min(s.pipeRun, Math.max(0, st.runs.length - 1));
+      const run = st.runs[idx] || null;
+      const det = run ? s.pipeDetail[run.id] : null;
+      const loading = open && !!run && !det;
+      const outText = det && det.output ? JSON.stringify(det.output, null, 2) : '';
+
+      const raw = det && det.prompt ? det.prompt : '';
+      const q = s.pipeQuery.trim();
+      const long = raw.length > 2400;
+      const expanded = !!s.pipeExpanded[run ? run.id : 0];
+      const searching = q.length >= 2;
+      let hits = [];
+      if (searching && raw) {
+        const lines = raw.split('\n');
+        const needle = q.toLowerCase();
+        for (let li = 0; li < lines.length && hits.length < 80; li++) {
+          if (lines[li].toLowerCase().indexOf(needle) >= 0) hits.push({ num: String(li + 1), text: lines[li].trim().slice(0, 400) });
+        }
+      }
+      return {
+        key: st.key, title: st.title, num: (i + 1) + ' / 8',
+        kindText: st.kind === 'llm' ? 'МОДЕЛЬ' : 'КОД',
+        kindBg: st.kind === 'llm' ? 'rgba(60,150,180,0.1)' : '#1e1e23',
+        kindFg: st.kind === 'llm' ? 'oklch(0.78 0.13 205)' : '#85858d',
+        statusText: pill.t, statusBg: pill.bg, statusFg: pill.fg,
+        summary: st.summary, open,
+        chevron: open ? '−' : '+',
+        aria: (open ? 'Свернуть' : 'Раскрыть') + ' этап ' + st.title,
+        toggle: () => this.toggleStage(st),
+        keyHandler: this.key(() => this.toggleStage(st)),
+        rowBg: open ? '#17171b' : '#141417',
+        isLlm: open && st.kind === 'llm' && st.runs.length > 0,
+        isCode: open && st.kind === 'code',
+        isSkipped: open && st.runs.length === 0 && st.kind === 'llm',
+        skipNote: st.summary,
+        facts: st.facts || [],
+        hasFacts: (st.facts || []).length > 0,
+        showTabs: st.runs.length > 1,
+        tabsNote: 'на этапе ' + st.runs.length + ' вызова — по одному на рассмотренный ролик',
+        runTabs: st.runs.map((r, j) => ({
+          label: (r.subject || ('вызов ' + (j + 1))) + (r.status === 'failed' ? ' · сорвался' : ''),
+          pick: () => this.pickRun(st, j),
+          bg: j === idx ? '#2a2a31' : 'transparent',
+          fg: j === idx ? '#f2f3f5' : '#8b8b93',
+          bc: j === idx ? '#3d3d45' : '#2a2a30'
+        })),
+        hasRun: !!run,
+        run: run ? {
+          model: run.model, attempts: String(run.attempts),
+          attemptsNote: run.attempts > 1 ? 'повторы объясняют длительность' : 'без повторов',
+          duration: this.dur(run.durationMs),
+          promptTokens: this.nfmt(run.promptTokens),
+          completionTokens: this.nfmt(run.completionTokens),
+          cost: '≈ ' + this.usd(run.costUsd),
+          decision: run.decision,
+          hasError: !!run.error, error: run.error || '',
+          hasSubject: !!run.subject, subject: run.subject || '',
+          batchNote: run.batchSize > 1
+            ? 'Вызов обслужил ' + run.batchSize + ' игр одной пачкой: текст ниже — для этой игры, а токены, время и стоимость посчитаны на всю пачку.'
+            : '',
+          hasBatch: run.batchSize > 1,
+          statusText: run.status === 'ok' ? 'вызов прошёл' : 'вызов сорвался',
+          statusFg: run.status === 'ok' ? 'oklch(0.78 0.13 205)' : 'oklch(0.75 0.16 25)'
+        } : null,
+        loading,
+        detReady: !!det && !det.missing,
+        hasSystem: !!det && !!det.system,
+        system: det && det.system ? det.system : '',
+        systemChars: det && det.system ? this.nfmt(det.system.length) + ' знаков' : '',
+        noSystemNote: 'У этого вызова постоянной части нет — модель получает только данные.',
+        showNoSystem: !!det && !det.missing && !det.system,
+        prompt: searching ? '' : (long && !expanded ? raw.slice(0, 1800) + '\n…' : raw),
+        promptChars: raw ? this.nfmt(raw.length) + ' знаков' : '',
+        showRawText: !!raw && !searching,
+        canCollapse: long && !searching,
+        collapseLabel: expanded ? 'свернуть' : 'показать целиком',
+        collapseNote: long && !expanded ? 'показаны первые 1 800 знаков из ' + this.nfmt(raw.length) : '',
+        toggleCollapse: () => this.setState(x => ({ pipeExpanded: Object.assign({}, x.pipeExpanded, { [run.id]: !x.pipeExpanded[run.id] }) })),
+        canSearch: raw.length > 2400,
+        query: s.pipeQuery,
+        setQuery: e => this.setState({ pipeQuery: e.target.value }),
+        searching,
+        hits,
+        hasHits: searching && hits.length > 0,
+        noHits: searching && hits.length === 0,
+        hitsNote: hits.length >= 80 ? 'больше 80 строк — уточните запрос' : 'совпадений в строках: ' + hits.length,
+        hasOutput: !!det && !!det.output,
+        outToks: this.jsonToks(outText),
+        noOutput: !!det && !det.missing && !det.output
+      };
+    });
+
+    const t = p.totals;
+    const outcomes = {};
+    p.candidates.forEach(c => { outcomes[c.outcome] = (outcomes[c.outcome] || 0) + 1; });
+    const confMap = { high: 'высокая', medium: 'средняя', low: 'низкая' };
+
+    return {
+      show: true, loadingModule: false, title: g.title, slug: s.slug,
+      recorded: p.recorded, notRecorded: !p.recorded,
+      close: () => this.hidePipe(),
+      stop: e => e.stopPropagation(),
+      totals: t ? [
+        { k: 'ВЫЗОВОВ К МОДЕЛИ', v: String(t.calls), note: 'по этой игре' },
+        { k: 'СОРВАЛОСЬ', v: String(t.failed), note: t.failed ? 'см. этапы ниже' : 'все прошли', fg: t.failed ? 'oklch(0.75 0.16 25)' : '#edeef0' },
+        { k: 'ТОКЕНОВ НА ВХОДЕ', v: this.nfmt(t.promptTokens), note: 'из ответов провайдера' },
+        { k: 'ТОКЕНОВ НА ВЫХОДЕ', v: this.nfmt(t.completionTokens), note: 'из ответов провайдера' },
+        { k: 'ВРЕМЯ', v: this.dur(t.durationMs), note: 'сумма по вызовам' },
+        { k: 'СТОИМОСТЬ, ОЦЕНКА', v: '≈ ' + this.usd(t.costUsd), note: 'по прайсу из конфига' }
+      ] : [],
+      costNote: 'Стоимость — оценка: считается по прайсу из конфига, провайдер её не присылает.',
+      stages,
+      hasCandidates: p.candidates.length > 0,
+      candidatesNote: p.candidates.length + ' рассмотрено · ' + Object.keys(outcomes).map(k => outcomes[k] + ' ' + k.replace(/^отбракован.*/, 'отбраковано').replace(/^взят$/, 'взят')).join(' · '),
+      candidates: p.candidates.map(c => ({
+        position: '#' + c.position, videoId: c.videoId, title: c.title, channel: c.channel,
+        views: this.nfmt(c.views) + ' просмотров',
+        duration: Math.floor(c.durationS / 60) + ':' + (c.durationS % 60 < 10 ? '0' : '') + (c.durationS % 60),
+        chars: c.transcriptChars === null ? 'расшифровки нет' : this.nfmt(c.transcriptChars) + ' знаков расшифровки',
+        verdict: c.matches === null ? 'судья не вызывался' : (c.matches ? 'та же игра' : 'другая игра'),
+        conf: c.confidence ? 'уверенность ' + confMap[c.confidence] : '',
+        hasConf: !!c.confidence,
+        hasReason: !!c.reason, reason: c.reason,
+        outcome: c.outcome,
+        outFg: c.outcome === 'взят' ? 'oklch(0.72 0.19 145)' : (c.outcome.indexOf('сорвал') >= 0 ? 'oklch(0.75 0.16 25)' : '#9a9ba3'),
+        accent: c.outcome === 'взят' ? 'oklch(0.72 0.19 145)' : '#2c2c33'
+      })),
+      noneNote: 'По этой игре конвейер ничего не записал: она собрана до того, как записи начали храниться. Этапы прошли, но их следов нет — это не ошибка и не пустой ответ.',
+      dialogPad: s.vp === 'mobile' ? '0' : '24px',
+      dialogRadius: s.vp === 'mobile' ? '0' : '14px',
+      dialogH: s.vp === 'mobile' ? '100%' : 'min(88vh, 900px)',
+      totalCols: s.vp === 'mobile' ? 'repeat(2, minmax(0, 1fr))' : 'repeat(3, minmax(0, 1fr))',
+      metricCols: s.vp === 'mobile' ? 'repeat(2, minmax(0, 1fr))' : 'repeat(3, minmax(0, 1fr))',
+      candCols: s.vp === 'desktop' ? 'repeat(2, minmax(0, 1fr))' : '1fr'
+    };
+  }
+
   componentDidMount() {
-    this.onKey = e => { if (e.key === 'Escape' && this.state.videoOpen) this.hideVideo(); };
+    this.onKey = e => {
+      if (e.key !== 'Escape') return;
+      if (this.state.videoOpen) this.hideVideo();
+      else if (this.state.pipeOpen) this.hidePipe();
+    };
     window.addEventListener('keydown', this.onKey);
+    import('./pipeline-data.js').then(m => this.setState({ pipeMod: m })).catch(() => {});
     this.onScroll = () => {
       if (this.state.route !== 'list' || this.state.loading) return;
       const rest = document.documentElement.scrollHeight - window.scrollY - window.innerHeight;
@@ -655,7 +1167,7 @@ class Component extends DCLogic {
     };
     window.addEventListener('scroll', this.onScroll, { passive: true });
   }
-  componentWillUnmount() { window.removeEventListener('scroll', this.onScroll); window.removeEventListener('keydown', this.onKey); clearTimeout(this.t); }
+  componentWillUnmount() { window.removeEventListener('scroll', this.onScroll); window.removeEventListener('keydown', this.onKey); clearTimeout(this.t); clearTimeout(this.rt); }
 
   more() {
     if (this.state.loading) return;
@@ -798,6 +1310,11 @@ class Component extends DCLogic {
       { id: 'game-no-fields', name: 'Карточка — нет даты, разработчика, жанров' },
       { id: 'game-broken-cover', name: 'Карточка — битая ссылка на обложку' },
       { id: 'game-long', name: 'Карточка — очень длинные данные' },
+      { id: 'pipe-full', name: 'Конвейер — все восемь этапов' },
+      { id: 'pipe-skipped', name: 'Конвейер — половина этапов пропущена' },
+      { id: 'pipe-failed', name: 'Конвейер — сорвавшиеся вызовы' },
+      { id: 'pipe-empty', name: 'Конвейер — ничего не записано' },
+      { id: 'pipe-404', name: 'Конвейер — 404, записей по адресу нет' },
       { id: 'list-stale', name: 'Список — обход давно не удавался' },
       { id: 'error-404', name: 'Ошибка 404 — игры нет' },
       { id: 'error-500', name: 'Ошибка 500 — сервер не ответил' }
@@ -821,17 +1338,32 @@ class Component extends DCLogic {
       'game-broken-cover': { route: 'game', slug: 'mecha-drift-2' },
       'game-long': { route: 'game', slug: 'the-cartographers-daughter-remastered-anniversary-edition' },
       'list-stale': { route: 'list', stale: true },
+      'pipe-full': { route: 'game', slug: 'onimusha-way-of-the-sword', pipeOpen: true, pipeStage: 'letsplay_judge', pipeRun: 0 },
+      'pipe-skipped': { route: 'game', slug: 'tidebound', pipeOpen: true, pipeStage: 'summary_critic' },
+      'pipe-failed': { route: 'game', slug: 'grand-prix-2027', pipeOpen: true, pipeStage: 'summary_user' },
+      'pipe-empty': { route: 'game', slug: 'rust-and-rain', pipeOpen: true, pipeStage: null },
+      'pipe-404': { route: 'game', slug: 'onimusha-way-of-the-sword', pipeOpen: true, pipeStage: null, pipeError: 404 },
       'error-404': { route: 'error', errorCode: 404, slug: 'gothic-1-remake' },
       'error-500': { route: 'error', errorCode: 500 }
     };
-    this.setState(Object.assign(base, map[id]));
+    const patch = Object.assign(base, { pipeOpen: false, pipeStage: null, pipeRun: 0, pipeError: null, pipeQuery: '' }, map[id]);
+    this.setState(patch);
+    if (patch.pipeOpen) {
+      const p = this.state.pipeMod && this.state.pipeMod.pipeline(patch.slug);
+      const st = p && p.stages.find(x => x.key === patch.pipeStage);
+      if (st && st.runs.length) this.fetchRun(st.runs[0].id);
+      this.focusDialog();
+    }
     this.top();
   }
 
   url() {
     const s = this.state;
     if (s.route === 'error') return s.errorCode === 404 ? '/game/' + s.slug + '  →  404 not_found' : '/api/games  →  500 internal_error';
-    if (s.route === 'game') return '/game/' + s.slug;
+    if (s.route === 'game') {
+      if (s.pipeOpen && s.pipeError) return '/game/' + s.slug + '?pipeline=all  →  404 not_found';
+      return '/game/' + s.slug + (s.pipeOpen ? '?pipeline=' + (s.pipeStage || 'all') : '');
+    }
     const p = [];
     if (s.platform) p.push('platform=' + encodeURIComponent(s.platform));
     if (s.q.trim()) p.push('q=' + encodeURIComponent(s.q.trim()));
@@ -921,6 +1453,8 @@ class Component extends DCLogic {
       reset: () => this.setState({ q: '', platform: null, shown: PAGE }),
       emptyDb: onList && s.emptyDb,
       goList: () => this.backToList(),
+      pipe: this.pipeVM(),
+      openPipe: () => this.showPipe(),
       game: this.detail(s.slug)
     };
   }

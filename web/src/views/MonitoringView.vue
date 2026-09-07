@@ -7,6 +7,7 @@ import type {
   LetsplayOutcomesDto,
   WorkerStatusDto,
 } from '../api/types.js';
+import JsonView from '../components/JsonView.vue';
 import { useEventStream } from '../lib/eventStream.js';
 import {
   agoText,
@@ -444,9 +445,11 @@ const quietJournal = computed(() => loaded.value && events.value.length === 0);
                 {{ openIds.includes(e.id) ? 'скрыть data' : 'data' }}
               </button>
             </div>
-            <pre v-if="openIds.includes(e.id)" class="log__data noscroll">{{
-              JSON.stringify(e.data, null, 2)
-            }}</pre>
+            <JsonView
+              v-if="openIds.includes(e.id)"
+              class="log__data"
+              :text="JSON.stringify(e.data, null, 2)"
+            />
           </div>
         </div>
 
@@ -1033,11 +1036,6 @@ const quietJournal = computed(() => loaded.value && events.value.length === 0);
   background: #101013;
   border: 1px solid var(--border);
   border-radius: 8px;
-  font-family: var(--mono);
-  font-size: 11px;
-  line-height: 1.6;
-  color: #a9c7d1;
-  overflow-x: auto;
 }
 
 .loading {

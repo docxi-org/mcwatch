@@ -7,6 +7,11 @@
  */
 export type {
   GameCardDto,
+  PipelineCandidateDto,
+  PipelineDto,
+  PipelineRunDto,
+  PipelineStageDto,
+  PipelineTotalsDto,
   GameListDto,
   GameListItemDto,
   LetsplayDto,

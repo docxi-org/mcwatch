@@ -1,5 +1,6 @@
 import type {
   GameCardDto,
+  PipelineDto,
   GameListDto,
   PlatformDto,
   SortKey,
@@ -71,6 +72,32 @@ export function fetchGames(query: ListQuery, signal?: AbortSignal): Promise<Game
 
 export function fetchGame(slug: string, signal?: AbortSignal): Promise<GameCardDto> {
   return getJson<GameCardDto>(`/api/games/${encodeURIComponent(slug)}`, signal);
+}
+
+/** Оглавление конвейера: этапы, метрики, кандидаты. Без сырья. */
+export function fetchPipeline(slug: string, signal?: AbortSignal): Promise<PipelineDto> {
+  return getJson<PipelineDto>(`/api/games/${encodeURIComponent(slug)}/pipeline`, signal);
+}
+
+/** Сырьё и ответ одного вызова: дёргается только при раскрытии шага. */
+export interface RunPayloadDto {
+  id: number;
+  stage: string;
+  subject: string | null;
+  system: string;
+  prompt: string;
+  output: unknown;
+}
+
+export function fetchRunPayload(
+  slug: string,
+  id: number,
+  signal?: AbortSignal,
+): Promise<RunPayloadDto> {
+  return getJson<RunPayloadDto>(
+    `/api/games/${encodeURIComponent(slug)}/pipeline/runs/${id}`,
+    signal,
+  );
 }
 
 export function fetchPlatforms(signal?: AbortSignal): Promise<PlatformDto[]> {

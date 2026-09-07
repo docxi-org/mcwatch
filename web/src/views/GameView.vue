@@ -1,9 +1,11 @@
 <script setup lang="ts">
 import { computed, onBeforeUnmount, ref, watch } from 'vue';
+import { useRoute, useRouter } from 'vue-router';
 import { ApiError, fetchGame } from '../api/client.js';
 import type { GameCardDto } from '../api/types.js';
 import CoverArt from '../components/CoverArt.vue';
 import LetsplayBlock from '../components/LetsplayBlock.vue';
+import PipelineDialog from '../components/PipelineDialog.vue';
 import PlatformScores from '../components/PlatformScores.vue';
 import ScoreBadge from '../components/ScoreBadge.vue';
 import SimilarGames from '../components/SimilarGames.vue';
@@ -23,6 +25,36 @@ const failure = ref<ApiError | null>(null);
 const videoOpen = ref(false);
 /** Заставка выводится из адреса проигрывателя и может не открыться. */
 const posterBroken = ref(false);
+
+/**
+ * Окно конвейера живёт в адресе: `?pipeline=<ключ этапа>` или `?pipeline=all`.
+ * Ссылкой на конкретный шаг можно поделиться — требование спеки.
+ */
+const route = useRoute();
+const router = useRouter();
+
+const pipelineParam = computed(() => {
+  const raw = route.query['pipeline'];
+  return typeof raw === 'string' ? raw : null;
+});
+const pipelineOpen = computed(() => pipelineParam.value !== null);
+const pipelineStage = computed(() =>
+  pipelineParam.value === null || pipelineParam.value === 'all' ? null : pipelineParam.value,
+);
+
+function openPipeline(): void {
+  void router.push({ query: { ...route.query, pipeline: 'all' } });
+}
+
+function closePipeline(): void {
+  const query = { ...route.query };
+  delete query['pipeline'];
+  void router.push({ query });
+}
+
+function setPipelineStage(key: string | null): void {
+  void router.replace({ query: { ...route.query, pipeline: key ?? 'all' } });
+}
 let inFlight: AbortController | null = null;
 
 async function load(slug: string): Promise<void> {
@@ -232,6 +264,11 @@ const hasAnySummary = computed(
             <span class="head__scalenote mono"
               >лучшие значения среди платформ · по каждой платформе оценки свои</span
             >
+
+            <!-- Вход в изнанку: чем сервис занимался, пока собирал карточку. -->
+            <button type="button" class="pipe-btn" @click="openPipeline">
+              <span class="pipe-btn__mark mono">LLM</span>Как это собрано
+            </button>
           </div>
 
           <p v-if="game.description" class="desc">{{ game.description }}</p>
@@ -269,6 +306,15 @@ const hasAnySummary = computed(
           <SimilarGames :games="game.similar" />
         </div>
       </div>
+
+      <PipelineDialog
+        v-if="pipelineOpen"
+        :slug="game.slug"
+        :title="game.title"
+        :stage="pipelineStage"
+        @close="closePipeline"
+        @stage="setPipelineStage"
+      />
 
       <TrailerDialog
         v-if="videoOpen && game.videoUrl"
@@ -509,6 +555,31 @@ const hasAnySummary = computed(
 .head__nogenres {
   font-size: 11px;
   color: #64646c;
+}
+
+.pipe-btn {
+  align-self: flex-start;
+  margin-top: 6px;
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  min-height: 44px;
+  padding: 0 16px;
+  border-radius: var(--r-md);
+  border: 1px solid #35353d;
+  background: #1c1c21;
+  color: var(--text);
+  font-size: 13.5px;
+}
+
+.pipe-btn:hover {
+  border-color: var(--accent);
+}
+
+.pipe-btn__mark {
+  font-size: 10px;
+  letter-spacing: 0.06em;
+  color: var(--accent);
 }
 
 .head__scalenote {
