@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { appearedSlugs } from '../web/src/lib/catalogWatch.js';
 import {
   filtersFromQuery,
   filtersKey,
@@ -119,5 +120,29 @@ describe('служебное', () => {
   it('подпись сортировки — дословно из макета', () => {
     expect(sortNote('date')).toBe('сортировка: по дате');
     expect(sortNote('metascore')).toBe('сортировка: по метаскору');
+  });
+});
+
+describe('обновление списка на месте', () => {
+  const game = (slug: string): { slug: string } => ({ slug });
+
+  it('находит появившиеся игры: без пометки их не заметить', () => {
+    const before = [game('а'), game('б')] as never[];
+    const after = [game('новая'), game('а'), game('б')] as never[];
+
+    expect(appearedSlugs(before, after)).toEqual(['новая']);
+  });
+
+  it('пропавшие игры пометкой не считаются', () => {
+    const before = [game('а'), game('б')] as never[];
+    const after = [game('а')] as never[];
+
+    expect(appearedSlugs(before, after)).toEqual([]);
+  });
+
+  it('без изменений пометок нет', () => {
+    const same = [game('а'), game('б')] as never[];
+
+    expect(appearedSlugs(same, same)).toEqual([]);
   });
 });

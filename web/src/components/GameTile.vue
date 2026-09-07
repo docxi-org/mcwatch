@@ -9,7 +9,14 @@ import ScoreBadge from './ScoreBadge.vue';
  * Плитка списка. Это ссылка, а не блок с обработчиком: клавиатура, средний
  * клик и «открыть в новой вкладке» тогда достаются бесплатно.
  */
-const props = defineProps<{ game: GameListItemDto }>();
+const props = withDefaults(
+  defineProps<{
+    game: GameListItemDto;
+    /** Игра появилась при обновлении: помечается на несколько секунд. */
+    fresh?: boolean;
+  }>(),
+  { fresh: false },
+);
 
 const platformsText = computed(() =>
   props.game.platforms.length > 0 ? props.game.platforms.join(' · ') : 'платформы не указаны',
@@ -19,6 +26,7 @@ const platformsText = computed(() =>
 <template>
   <RouterLink
     class="tile"
+    :class="{ 'tile--fresh': props.fresh }"
     :to="{ name: 'game', params: { slug: props.game.slug } }"
     :aria-label="`Открыть карточку игры ${props.game.title}`"
   >
@@ -66,6 +74,16 @@ const platformsText = computed(() =>
 .tile:hover {
   border-color: var(--border-hover);
   color: inherit;
+}
+
+/*
+ * Пометка новизны: обновление на месте ничего не двигает, и появление игры
+ * иначе осталось бы незамеченным. Гаснет само.
+ */
+.tile--fresh {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 1px var(--accent);
+  transition: border-color 1.2s ease-out, box-shadow 1.2s ease-out;
 }
 
 .tile__cover {

@@ -13,6 +13,7 @@ import GameTile from '../components/GameTile.vue';
 import { hoursSince, plural, stampHuman, stampText } from '../lib/format.js';
 import { saveList, takeList } from '../lib/listCache.js';
 import {
+  MAX_PAGE_SIZE,
   PAGE_SIZE,
   SORTS,
   filtersFromQuery,
@@ -23,6 +24,7 @@ import {
   type ListFilters,
 } from '../lib/listFilters.js';
 import { MIN_LOADING_MS, remainingMs } from '../lib/pacing.js';
+import { FRESH_MS, POLL_MS, appearedSlugs } from '../lib/catalogWatch.js';
 import { crawlerLastRun, useServiceStatus } from '../lib/serviceStatus.js';
 
 /**
@@ -45,6 +47,10 @@ const platforms = ref<PlatformDto[]>([]);
 /** Всего игр в базе — число для чипа «Все платформы», как в макете. */
 const baseTotal = ref<number | null>(null);
 const facets = ref<FacetsDto | null>(null);
+/** Игры, появившиеся при обновлении: помечаются на несколько секунд. */
+const freshSlugs = ref<Set<string>>(new Set());
+let pollTimer: ReturnType<typeof setInterval> | null = null;
+let freshTimer: ReturnType<typeof setTimeout> | null = null;
 
 /** Черновик поиска: в адрес он уезжает с задержкой, иначе история засоряется. */
 const draft = ref('');
@@ -219,6 +225,51 @@ function syncCols(): void {
       : 2;
 }
 
+// ── Обновление на месте ────────────────────────────────────────────────────
+
+/**
+ * Тихое обновление уже загруженного. Список отрисован по ключу `slug`, и
+ * замена массива не пересоздаёт карточки: те же узлы DOM, обложки не моргают,
+ * наведение не слетает. Вставку выше видимой области браузер компенсирует
+ * якорением прокрутки — читающий человек остаётся на том же месте.
+ */
+async function poll(): Promise<void> {
+  if (document.hidden || loading.value || items.value.length === 0) return;
+
+  try {
+    // Спрашиваем ровно столько, сколько уже показано, одним запросом.
+    const size = Math.min(MAX_PAGE_SIZE, Math.max(PAGE_SIZE, items.value.length));
+    const [result, f] = await Promise.all([
+      fetchGames({ ...filters.value, page: 1, pageSize: size }),
+      fetchFacets(),
+    ]);
+
+    const appeared = appearedSlugs(items.value, result.items);
+
+    items.value = result.items;
+    total.value = result.total;
+    page.value = Math.max(1, Math.ceil(result.items.length / PAGE_SIZE));
+    facets.value = f;
+
+    if (appeared.length > 0) markFresh(appeared);
+  } catch {
+    // Не достучались — молчим: страница уже показывает то, что показывала.
+  }
+}
+
+function markFresh(slugs: string[]): void {
+  freshSlugs.value = new Set([...freshSlugs.value, ...slugs]);
+  if (freshTimer) clearTimeout(freshTimer);
+  freshTimer = setTimeout(() => {
+    freshSlugs.value = new Set();
+  }, FRESH_MS);
+}
+
+/** Возврат на вкладку — момент, когда человек заведомо не читает. */
+function onVisible(): void {
+  if (!document.hidden) void poll();
+}
+
 // ── Подгрузка при прокрутке ────────────────────────────────────────────────
 
 const sentinel = ref<HTMLElement | null>(null);
@@ -245,6 +296,8 @@ watch(sentinel, watchSentinel);
 onMounted(() => {
   syncCols();
   window.addEventListener('resize', syncCols);
+  document.addEventListener('visibilitychange', onVisible);
+  pollTimer = setInterval(() => void poll(), POLL_MS);
   draft.value = filters.value.q ?? '';
   void fetchPlatforms()
     .then((list) => {
@@ -319,6 +372,9 @@ onBeforeUnmount(() => {
   observer?.disconnect();
   inFlight?.abort();
   window.removeEventListener('resize', syncCols);
+  document.removeEventListener('visibilitychange', onVisible);
+  if (pollTimer) clearInterval(pollTimer);
+  if (freshTimer) clearTimeout(freshTimer);
   if (draftTimer) clearTimeout(draftTimer);
 });
 </script>
@@ -442,7 +498,12 @@ onBeforeUnmount(() => {
         </div>
 
         <div class="grid">
-          <GameTile v-for="game in items" :key="game.slug" :game="game" />
+          <GameTile
+            v-for="game in items"
+            :key="game.slug"
+            :game="game"
+            :fresh="freshSlugs.has(game.slug)"
+          />
           <!--
             Догрузка обязана быть видимой: ряд заглушек говорит, что страница
             уже едет, — иначе карточки появляются молча (макет, `skelCount`).

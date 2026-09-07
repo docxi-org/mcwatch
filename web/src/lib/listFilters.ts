@@ -9,6 +9,9 @@ import type { SortKey } from '../api/types.js';
 export const DEFAULT_SORT: SortKey = 'date';
 export const PAGE_SIZE = 24;
 
+/** Потолок страницы у API: за один запрос больше не отдаётся. */
+export const MAX_PAGE_SIZE = 100;
+
 export const SORTS: { key: SortKey; label: string }[] = [
   { key: 'date', label: 'по дате' },
   { key: 'metascore', label: 'по метаскору' },
