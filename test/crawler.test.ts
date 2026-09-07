@@ -7,10 +7,11 @@ import type {
   GameCard,
   ListedGame,
   MetacriticClient,
+  Review,
   ScoreStats,
 } from '../src/clients/metacritic/index.js';
 import { createDb, runMigrations, type DbHandle } from '../src/db/index.js';
-import { crawlState, gamePlatforms, games } from '../src/db/schema.js';
+import { crawlState, gamePlatforms, games, reviews } from '../src/db/schema.js';
 import { runCrawlOnce } from '../src/workers/crawler.js';
 
 /** Логи в тестах не нужны, но и глушить их молча не стоит — уровень явный. */
@@ -29,7 +30,11 @@ function listed(slug: string): ListedGame {
   };
 }
 
-function card(slug: string, platforms: string[] = ['playstation-5']): GameCard {
+function card(
+  slug: string,
+  platforms: string[] = ['playstation-5'],
+  criticCount = 0,
+): GameCard {
   return {
     slug,
     title: `Игра ${slug}`,
@@ -45,7 +50,7 @@ function card(slug: string, platforms: string[] = ['playstation-5']): GameCard {
       name: p.toUpperCase(),
       slug: p,
       metascore: 80 + i,
-      criticCount: 10 + i,
+      criticCount,
       isLead: i === 0,
     })),
   };
@@ -57,10 +62,33 @@ interface FakeOptions {
   cardPlatforms?: Record<string, string[]>;
   failCardFor?: Set<string>;
   failUserScoreFor?: Set<string>;
+  /** Сколько отзывов вида отдавать; 0 или отсутствие — отзывов нет. */
+  reviewCounts?: { critic?: number; user?: number };
+  failReviewsFor?: Set<string>;
+}
+
+function review(kind: 'critic' | 'user', id: string, sentiment: string | null): Review {
+  return {
+    externalId: id,
+    kind,
+    text: `текст ${id}`,
+    score: kind === 'critic' ? 80 : 8,
+    scoreMax: kind === 'critic' ? 100 : 10,
+    author: `автор ${id}`,
+    date: '2026-09-01',
+    url: `https://x/${id}`,
+    platform: 'PLAYSTATION-5',
+    sentiment: sentiment as Review['sentiment'],
+  };
 }
 
 function fakeClient(opts: FakeOptions = {}) {
-  const calls = { list: [] as string[], cards: [] as string[], stats: [] as string[] };
+  const calls = {
+    list: [] as string[],
+    cards: [] as string[],
+    stats: [] as string[],
+    reviews: [] as string[],
+  };
 
   const client = {
     listNewReleases: () => {
@@ -84,14 +112,37 @@ function fakeClient(opts: FakeOptions = {}) {
       if (opts.failCardFor?.has(slug)) {
         return Promise.reject(new Error(`карточка ${slug} недоступна`));
       }
-      return Promise.resolve(card(slug, opts.cardPlatforms?.[slug]));
+      return Promise.resolve(
+        card(slug, opts.cardPlatforms?.[slug], opts.reviewCounts?.critic ?? 0),
+      );
     },
     getScoreStats: (_kind: string, slug: string, platform: string | null) => {
       calls.stats.push(`${slug}/${platform ?? '-'}`);
       if (opts.failUserScoreFor?.has(slug)) {
         return Promise.reject(new Error('оценки пользователей недоступны'));
       }
-      return Promise.resolve({ score: 8.5, max: 10, reviewCount: 42 } as ScoreStats);
+      return Promise.resolve({
+        score: 8.5,
+        max: 10,
+        reviewCount: opts.reviewCounts?.user ?? 0,
+      } as ScoreStats);
+    },
+    listReviews: (
+      kind: 'critic' | 'user',
+      slug: string,
+      o: { platform?: string | null; sentiment?: string; max?: number } = {},
+    ) => {
+      calls.reviews.push(`${kind}/${slug}/${o.platform ?? '-'}/${o.sentiment ?? 'all'}`);
+      if (opts.failReviewsFor?.has(slug)) {
+        return Promise.reject(new Error('отзывы недоступны'));
+      }
+      const n = opts.reviewCounts?.[kind] ?? 0;
+      const take = Math.min(n, o.max ?? n);
+      return Promise.resolve(
+        Array.from({ length: take }, (_, i) =>
+          review(kind, `${kind}-${o.sentiment ?? 'all'}-${i}`, o.sentiment === 'neutral' ? 'mixed' : (o.sentiment ?? null)),
+        ),
+      );
     },
   };
 
@@ -118,6 +169,7 @@ const at = (iso: string) => () => new Date(iso);
 const allGames = () => handle.db.select().from(games).all();
 const allPlatforms = () => handle.db.select().from(gamePlatforms).all();
 const state = () => handle.db.select().from(crawlState).all();
+const allReviews = () => handle.db.select().from(reviews).all();
 
 // ── Ротация ────────────────────────────────────────────────────────────────
 
@@ -213,6 +265,7 @@ describe('сохранение карточки', () => {
     const { client } = fakeClient({
       landing: ['a'],
       cardPlatforms: { a: ['playstation-5', 'pc'] },
+      reviewCounts: { critic: 9, user: 42 },
     });
 
     await runCrawlOnce({
@@ -236,6 +289,7 @@ describe('сохранение карточки', () => {
       expect.objectContaining({
         platform: 'PLAYSTATION-5',
         metascore: 80,
+        criticCount: 9,
         userscore: 8.5,
         userCount: 42,
       }),
@@ -366,5 +420,119 @@ describe('ошибка одного элемента не роняет обхо�
       developer: 'Разработчик',
       description: 'описание a',
     });
+  });
+});
+
+// ── Отзывы ─────────────────────────────────────────────────────────────────
+
+describe('сбор отзывов', () => {
+  const run = (client: MetacriticClient) =>
+    runCrawlOnce({ db: handle.db, client, now: at('2026-09-07T10:00:00Z'), log });
+
+  it('сохраняет критиков и пользователей раздельно, каждый со своей шкалой', async () => {
+    const { client } = fakeClient({
+      landing: ['a'],
+      reviewCounts: { critic: 4, user: 3 },
+    });
+
+    const result = await run(client);
+
+    const rows = allReviews();
+    const critic = rows.filter((r) => r.kind === 'critic');
+    const user = rows.filter((r) => r.kind === 'user');
+
+    expect(critic.length).toBeGreaterThan(0);
+    expect(user.length).toBeGreaterThan(0);
+    expect(critic.every((r) => r.scoreMax === 100)).toBe(true);
+    expect(user.every((r) => r.scoreMax === 10)).toBe(true);
+    expect(result.reviewsWritten.critic).toBe(critic.length);
+    expect(result.reviewsWritten.user).toBe(user.length);
+  });
+
+  it('пользователей берёт по тональностям, а не первыми подряд', async () => {
+    const { client, calls } = fakeClient({
+      landing: ['a'],
+      reviewCounts: { critic: 0, user: 5 },
+    });
+
+    await run(client);
+
+    // Три запроса — по одному на тональность (§4.1).
+    expect(calls.reviews.filter((c) => c.startsWith('user/'))).toEqual([
+      'user/a/playstation-5/positive',
+      'user/a/playstation-5/neutral',
+      'user/a/playstation-5/negative',
+    ]);
+    // Тональность источника сохраняется в словаре схемы.
+    expect(new Set(allReviews().map((r) => r.sentiment))).toEqual(
+      new Set(['positive', 'mixed', 'negative']),
+    );
+  });
+
+  it('критиков берёт одной выборкой без фильтра тональности', async () => {
+    const { client, calls } = fakeClient({
+      landing: ['a'],
+      reviewCounts: { critic: 3, user: 0 },
+    });
+
+    await run(client);
+
+    expect(calls.reviews.filter((c) => c.startsWith('critic/'))).toEqual([
+      'critic/a/playstation-5/all',
+    ]);
+    expect(allReviews().every((r) => r.sentiment === null)).toBe(true);
+  });
+
+  it('не ходит за отзывами туда, где их по счётчику нет', async () => {
+    const { client, calls } = fakeClient({
+      landing: ['a'],
+      cardPlatforms: { a: ['playstation-5', 'pc'] },
+      reviewCounts: { critic: 0, user: 0 },
+    });
+
+    await run(client);
+
+    expect(calls.reviews).toEqual([]);
+    expect(allReviews()).toEqual([]);
+  });
+
+  it('повторный обход не плодит дубли', async () => {
+    const first = fakeClient({ landing: ['a'], reviewCounts: { critic: 4, user: 3 } });
+    await run(first.client);
+    const afterFirst = allReviews().length;
+
+    const second = fakeClient({ landing: ['a'], reviewCounts: { critic: 4, user: 3 } });
+    await runCrawlOnce({
+      db: handle.db,
+      client: second.client,
+      now: at('2026-09-08T10:00:00Z'),
+      log,
+    });
+
+    expect(allReviews()).toHaveLength(afterFirst);
+  });
+
+  it('недоступные отзывы не роняют игру', async () => {
+    const { client } = fakeClient({
+      landing: ['a'],
+      reviewCounts: { critic: 4, user: 3 },
+      failReviewsFor: new Set(['a']),
+    });
+
+    const result = await run(client);
+
+    expect(result.saved).toBe(1);
+    expect(allGames()[0]?.status).toBe('ok');
+    expect(allReviews()).toEqual([]);
+  });
+
+  it('отзывы удаляются вместе с игрой: внешний ключ каскадный', async () => {
+    const { client } = fakeClient({ landing: ['a'], reviewCounts: { critic: 4 } });
+    await run(client);
+    expect(allReviews().length).toBeGreaterThan(0);
+
+    handle.sqlite.prepare("DELETE FROM games WHERE slug='a'").run();
+
+    expect(allReviews()).toEqual([]);
   });
 });

@@ -105,11 +105,14 @@ export class MetacriticClient {
   async listReviews(
     kind: ReviewKind,
     slug: string,
-    opts: { platform?: string | null; sentiment?: Sentiment } = {},
+    opts: { platform?: string | null; sentiment?: Sentiment; max?: number } = {},
   ): Promise<Review[]> {
     const collected: Review[] = [];
     const seen = new Set<string>();
-    const max = this.maxReviews[kind];
+    // `max` позволяет вызывающему добрать остаток, не превышая общий потолок:
+    // отзывы одной игры собираются по нескольким платформам.
+    const max = Math.max(0, Math.min(opts.max ?? this.maxReviews[kind], this.maxReviews[kind]));
+    if (max === 0) return [];
 
     // Тональность известна достоверно только при запросе с фильтром: при
     // `all` источник её не сообщает, и выдумывать её мы не станем.
