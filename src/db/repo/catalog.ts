@@ -1,6 +1,6 @@
 import { and, asc, count, desc, eq, like, max, sql, type SQL } from 'drizzle-orm';
 import type { Db } from '../index.js';
-import { gamePlatforms, games, reviews, summaries } from '../schema.js';
+import { gamePlatforms, games, letsplays, reviews, summaries } from '../schema.js';
 import type {
   GameListItemDto,
   PlatformDto,
@@ -18,6 +18,10 @@ export interface ListQuery {
   platform?: string | null;
   q?: string | null;
   sort?: SortKey;
+  /** Только игры, по которым есть заключение о летсплее. */
+  withLetsplay?: boolean;
+  /** Только игры, у которых Metacritic отдал трейлер. */
+  withTrailer?: boolean;
   page?: number;
   pageSize?: number;
 }
@@ -46,6 +50,19 @@ function whereFor(query: ListQuery): SQL | undefined {
       sql`EXISTS (SELECT 1 FROM ${gamePlatforms} gp
                   WHERE gp.game_slug = ${games.slug} AND gp.platform = ${query.platform})`,
     );
+  }
+
+  // «С летсплеем» — это готовое заключение, а не сам факт попытки: строка со
+  // статусом `no_video` тоже есть, но показывать в карточке нечего.
+  if (query.withLetsplay) {
+    parts.push(
+      sql`EXISTS (SELECT 1 FROM ${letsplays} lp
+                  WHERE lp.game_slug = ${games.slug} AND lp.status = 'done')`,
+    );
+  }
+
+  if (query.withTrailer) {
+    parts.push(sql`${games.videoUrl} IS NOT NULL`);
   }
 
   return parts.length === 0 ? undefined : and(...parts);
@@ -277,4 +294,34 @@ export function getGameBriefs(
     });
   }
   return out;
+}
+
+/** Сколько игр в базе попадает под каждый из дополнительных фильтров. */
+export interface FacetsDto {
+  withLetsplay: number;
+  withTrailer: number;
+}
+
+/**
+ * Числа для подписей на чипах. Считаются по всей базе, как и счётчики
+ * платформ: чип отвечает на вопрос «сколько такого вообще есть», а не
+ * «сколько осталось после текущего отбора».
+ */
+export function listFacets(db: Db): FacetsDto {
+  const withLetsplay = db
+    .select({ n: count() })
+    .from(games)
+    .where(
+      sql`EXISTS (SELECT 1 FROM ${letsplays} lp
+                  WHERE lp.game_slug = ${games.slug} AND lp.status = 'done')`,
+    )
+    .get();
+
+  const withTrailer = db
+    .select({ n: count() })
+    .from(games)
+    .where(sql`${games.videoUrl} IS NOT NULL`)
+    .get();
+
+  return { withLetsplay: withLetsplay?.n ?? 0, withTrailer: withTrailer?.n ?? 0 };
 }

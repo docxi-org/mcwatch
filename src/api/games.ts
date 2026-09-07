@@ -8,6 +8,7 @@ import {
   getPlatformScores,
   getReviewCounts,
   getSummaries,
+  listFacets,
   listGames,
   listPlatforms,
   MAX_PAGE_SIZE,
@@ -28,10 +29,18 @@ import type {
  * черновик маршрутов — `docs/ARCHITECTURE.md` §5.
  */
 
+/** `?letsplay=1` — включён; отсутствие параметра — фильтр не применён. */
+const flag = z
+  .enum(['1', 'true'])
+  .optional()
+  .transform((v) => v !== undefined);
+
 const listQuerySchema = z.object({
   platform: z.string().min(1).optional(),
   q: z.string().min(1).optional(),
   sort: z.enum(['metascore', 'userscore', 'date', 'title']).default('date'),
+  letsplay: flag,
+  trailer: flag,
   page: z.coerce.number().int().min(1).default(1),
   pageSize: z.coerce.number().int().min(1).max(MAX_PAGE_SIZE).default(DEFAULT_PAGE_SIZE),
 });
@@ -56,11 +65,13 @@ export function createCatalogRoutes(db: Db): Hono {
       );
     }
 
-    const { platform, q, sort, page, pageSize } = parsed.data;
+    const { platform, q, sort, letsplay, trailer, page, pageSize } = parsed.data;
     const result = listGames(db, {
       platform: platform ?? null,
       q: q ?? null,
       sort,
+      withLetsplay: letsplay,
+      withTrailer: trailer,
       page,
       pageSize,
     });
@@ -69,6 +80,9 @@ export function createCatalogRoutes(db: Db): Hono {
   });
 
   app.get('/platforms', (c) => c.json(listPlatforms(db)));
+
+  /** Числа для подписей на чипах дополнительных фильтров. */
+  app.get('/facets', (c) => c.json(listFacets(db)));
 
   app.get('/games/:slug', (c) => {
     const slug = c.req.param('slug');

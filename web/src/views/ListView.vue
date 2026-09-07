@@ -1,7 +1,13 @@
 <script setup lang="ts">
 import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue';
 import { onBeforeRouteLeave, useRoute, useRouter } from 'vue-router';
-import { ApiError, fetchGames, fetchPlatforms } from '../api/client.js';
+import {
+  ApiError,
+  fetchFacets,
+  fetchGames,
+  fetchPlatforms,
+  type FacetsDto,
+} from '../api/client.js';
 import type { GameListItemDto, PlatformDto, SortKey } from '../api/types.js';
 import GameTile from '../components/GameTile.vue';
 import { hoursSince, plural, stampHuman, stampText } from '../lib/format.js';
@@ -38,6 +44,7 @@ const failure = ref<ApiError | null>(null);
 const platforms = ref<PlatformDto[]>([]);
 /** Всего игр в базе — число для чипа «Все платформы», как в макете. */
 const baseTotal = ref<number | null>(null);
+const facets = ref<FacetsDto | null>(null);
 
 /** Черновик поиска: в адрес он уезжает с задержкой, иначе история засоряется. */
 const draft = ref('');
@@ -59,6 +66,27 @@ const countLine = computed(() => {
 const platformChips = computed(() =>
   [...platforms.value].sort((a, b) => b.gameCount - a.gameCount),
 );
+
+const emptyTitle = computed(() =>
+  filters.value.q ? `По запросу «${filters.value.q}» ничего не нашлось` : 'Под этот отбор игр нет',
+);
+
+/** Объяснение подбирается под то, чем именно отбор сузили. */
+const emptyNote = computed(() => {
+  if (filters.value.q) {
+    return 'Поиск идёт только по названию игры и не учитывает описания. Проверьте раскладку или снимите фильтр по платформе.';
+  }
+  if (filters.value.letsplay && filters.value.trailer) {
+    return 'Игр, у которых есть и заключение о летсплее, и трейлер, в базе нет. Снимите один из двух фильтров.';
+  }
+  if (filters.value.letsplay) {
+    return 'Заключение о летсплее есть не у всех игр: для многих релизов на YouTube просто нет прохождения, а найденные ролики оказываются про другую игру.';
+  }
+  if (filters.value.trailer) {
+    return 'Трейлер Metacritic публикует редко — примерно у одной игры из десяти.';
+  }
+  return 'Попробуйте выбрать другую платформу.';
+});
 
 const moreText = computed(
   () => `Показать ещё ${Math.min(PAGE_SIZE, Math.max(0, total.value - items.value.length))}`,
@@ -153,6 +181,15 @@ function pickPlatform(platform: string | null): void {
   applyFilters({ platform });
 }
 
+/** Дополнительные фильтры складываются друг с другом и с платформой. */
+function toggleLetsplay(): void {
+  applyFilters({ letsplay: !filters.value.letsplay });
+}
+
+function toggleTrailer(): void {
+  applyFilters({ trailer: !filters.value.trailer });
+}
+
 function onSearch(event: Event): void {
   draft.value = (event.target as HTMLInputElement).value;
   if (draftTimer) clearTimeout(draftTimer);
@@ -220,7 +257,23 @@ onMounted(() => {
 
   // Отдельный лёгкий запрос: счётчик на чипе «Все платформы» — это число игр
   // в базе, а сумма по платформам его не даёт (игра стоит на нескольких).
-  void fetchGames({ platform: null, q: null, sort: 'title', page: 1, pageSize: 1 })
+  void fetchFacets()
+    .then((f) => {
+      facets.value = f;
+    })
+    .catch(() => {
+      facets.value = null;
+    });
+
+  void fetchGames({
+    platform: null,
+    q: null,
+    sort: 'title',
+    letsplay: false,
+    trailer: false,
+    page: 1,
+    pageSize: 1,
+  })
     .then((result) => {
       baseTotal.value = result.total;
     })
@@ -331,6 +384,32 @@ onBeforeUnmount(() => {
       </button>
     </div>
 
+    <!--
+      Дополнительные фильтры складываются друг с другом, поэтому это
+      переключатели с `aria-pressed`, а не выбор одного из списка.
+    -->
+    <div v-if="facets" class="chips noscroll" role="group" aria-label="Дополнительные фильтры">
+      <span class="chips__label mono">ТОЛЬКО</span>
+      <button
+        type="button"
+        class="chip"
+        :class="{ 'chip--on': filters.letsplay }"
+        :aria-pressed="filters.letsplay"
+        @click="toggleLetsplay"
+      >
+        с летсплеем<span class="chip__count mono">{{ facets.withLetsplay }}</span>
+      </button>
+      <button
+        type="button"
+        class="chip"
+        :class="{ 'chip--on': filters.trailer }"
+        :aria-pressed="filters.trailer"
+        @click="toggleTrailer"
+      >
+        с трейлером<span class="chip__count mono">{{ facets.withTrailer }}</span>
+      </button>
+    </div>
+
     <!-- Сбой сервера. Отбор в адресе цел, поэтому «Обновить» вернёт то же. -->
     <div v-if="failure" class="failure">
       <span class="failure__code mono">{{ failure.status === 0 ? 'нет связи' : failure.status }}</span>
@@ -394,14 +473,8 @@ onBeforeUnmount(() => {
 
       <!-- Пусто по отбору и пусто в базе — разные вещи, и говорим о них разное. -->
       <div v-else-if="hasFilters" class="empty empty--big">
-        <span class="empty__title">{{
-          filters.q ? `По запросу «${filters.q}» ничего не нашлось` : 'Под этот отбор игр нет'
-        }}</span>
-        <span class="empty__note">{{
-          filters.q
-            ? 'Поиск идёт только по названию игры и не учитывает описания. Проверьте раскладку или снимите фильтр по платформе.'
-            : 'Попробуйте выбрать другую платформу.'
-        }}</span>
+        <span class="empty__title">{{ emptyTitle }}</span>
+        <span class="empty__note">{{ emptyNote }}</span>
         <button type="button" class="btn" @click="resetFilters">Сбросить отбор</button>
       </div>
 
@@ -515,9 +588,30 @@ onBeforeUnmount(() => {
 
 .chips {
   display: flex;
+  flex-wrap: wrap;
   gap: 7px;
-  overflow-x: auto;
   padding-bottom: 14px;
+}
+
+/*
+ * Перенос, а не прокрутка: платформ стало больше десятка, и половина
+ * уезжала за край незамеченной. На узком экране перенос съел бы пол-экрана,
+ * поэтому там остаётся горизонтальная прокрутка — как и требует спека.
+ */
+@media (max-width: 639px) {
+  .chips {
+    flex-wrap: nowrap;
+    overflow-x: auto;
+  }
+}
+
+.chips__label {
+  flex: none;
+  align-self: center;
+  font-size: 10px;
+  letter-spacing: 0.06em;
+  color: var(--muted-2);
+  padding-right: 2px;
 }
 
 .chip {

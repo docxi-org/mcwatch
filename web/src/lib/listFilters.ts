@@ -20,6 +20,10 @@ export interface ListFilters {
   platform: string | null;
   q: string | null;
   sort: SortKey;
+  /** Только игры с готовым заключением о летсплее. */
+  letsplay: boolean;
+  /** Только игры, у которых есть трейлер. */
+  trailer: boolean;
 }
 
 /** Сырое значение из адреса: vue-router отдаёт строку, массив либо ничего. */
@@ -36,6 +40,11 @@ function isSortKey(value: string | null): value is SortKey {
   return value === 'metascore' || value === 'userscore' || value === 'date' || value === 'title';
 }
 
+/** Признак включён, если параметр вообще есть: `?letsplay=1`. */
+function flag(value: RawQueryValue): boolean {
+  return first(value) !== null;
+}
+
 /**
  * Мусор в адресе не должен показывать экран ошибки: 400 пользователь может
  * получить, только вписав его руками. Негодные значения молча заменяются на
@@ -47,6 +56,8 @@ export function filtersFromQuery(query: Record<string, RawQueryValue>): ListFilt
     platform: first(query['platform']),
     q: first(query['q']),
     sort: isSortKey(sort) ? sort : DEFAULT_SORT,
+    letsplay: flag(query['letsplay']),
+    trailer: flag(query['trailer']),
   };
 }
 
@@ -55,15 +66,34 @@ export function filtersToQuery(filters: ListFilters): Record<string, string> {
   if (filters.platform) query['platform'] = filters.platform;
   if (filters.q) query['q'] = filters.q;
   if (filters.sort !== DEFAULT_SORT) query['sort'] = filters.sort;
+  if (filters.letsplay) query['letsplay'] = '1';
+  if (filters.trailer) query['trailer'] = '1';
   return query;
 }
 
+/**
+ * Ключ отбора для кэша списка. Собирается через `JSON.stringify`, а не
+ * склейкой через разделитель: любой разделитель рано или поздно встретится
+ * в поисковом запросе, и два разных отбора сойдутся в один ключ.
+ */
 export function filtersKey(filters: ListFilters): string {
-  return `${filters.platform ?? ''}\u0000${filters.q ?? ''}\u0000${filters.sort}`;
+  return JSON.stringify([
+    filters.platform,
+    filters.q,
+    filters.sort,
+    filters.letsplay,
+    filters.trailer,
+  ]);
 }
 
 export function isDefaultFilters(filters: ListFilters): boolean {
-  return filters.platform === null && filters.q === null && filters.sort === DEFAULT_SORT;
+  return (
+    filters.platform === null &&
+    filters.q === null &&
+    filters.sort === DEFAULT_SORT &&
+    !filters.letsplay &&
+    !filters.trailer
+  );
 }
 
 /** Подпись справа над сеткой — дословно из макета: «сортировка: по дате». */

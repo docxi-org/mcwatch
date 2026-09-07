@@ -26,14 +26,15 @@ interface SeedGame {
   platforms?: { name: string; meta?: number | null; user?: number | null }[];
   embedding?: number[];
   status?: 'ok' | 'failed';
+  videoUrl?: string | null;
 }
 
 function seed(g: SeedGame): void {
   handle.sqlite
     .prepare(
       `INSERT INTO games (slug, title, release_date, developer, genres, status,
-                          cover_url, embedding)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+                          cover_url, embedding, video_url)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     )
     .run(
       g.slug,
@@ -44,6 +45,7 @@ function seed(g: SeedGame): void {
       g.status ?? 'ok',
       `https://cover/${g.slug}.jpg`,
       g.embedding ? encodeEmbedding(Float32Array.from(g.embedding)) : null,
+      g.videoUrl ?? null,
     );
 
   for (const p of g.platforms ?? []) {
@@ -332,6 +334,51 @@ describe('GET /api/games/:slug', () => {
 });
 
 // ── Платформы ──────────────────────────────────────────────────────────────
+
+describe('дополнительные фильтры', () => {
+  beforeEach(() => {
+    seed({ slug: 'с-обоими', title: 'Both', videoUrl: 'https://cdn.jwplayer.com/players/a.html' });
+    seed({ slug: 'только-ролик', title: 'OnlyLetsplay' });
+    seed({ slug: 'только-трейлер', title: 'OnlyTrailer', videoUrl: 'https://cdn.jwplayer.com/players/b.html' });
+    seed({ slug: 'пустая', title: 'Nothing' });
+
+    const ins = handle.sqlite.prepare(
+      'INSERT INTO letsplays (game_slug, status, video_id) VALUES (?, ?, ?)',
+    );
+    ins.run('с-обоими', 'done', 'v1');
+    ins.run('только-ролик', 'done', 'v2');
+    // Строка есть, но заключения нет: такая игра под фильтр попадать не должна.
+    ins.run('только-трейлер', 'no_video', null);
+  });
+
+  it('«с летсплеем» — это заключение, а не сам факт попытки', async () => {
+    const { body } = await get<{ items: { slug: string }[] }>('/api/games?letsplay=1&sort=title');
+    expect(body.items.map((i) => i.slug).sort()).toEqual(['с-обоими', 'только-ролик']);
+  });
+
+  it('«с трейлером» отбирает по ссылке на видео', async () => {
+    const { body } = await get<{ items: { slug: string }[] }>('/api/games?trailer=1&sort=title');
+    expect(body.items.map((i) => i.slug).sort()).toEqual(['с-обоими', 'только-трейлер']);
+  });
+
+  it('фильтры складываются друг с другом', async () => {
+    const { body } = await get<{ items: { slug: string }[]; total: number }>(
+      '/api/games?letsplay=1&trailer=1',
+    );
+    expect(body.total).toBe(1);
+    expect(body.items[0]?.slug).toBe('с-обоими');
+  });
+
+  it('без параметров ничего не отсеивается', async () => {
+    const { body } = await get<{ total: number }>('/api/games');
+    expect(body.total).toBe(4);
+  });
+
+  it('счётчики для чипов считаются по всей базе', async () => {
+    const { body } = await get<{ withLetsplay: number; withTrailer: number }>('/api/facets');
+    expect(body).toEqual({ withLetsplay: 2, withTrailer: 2 });
+  });
+});
 
 describe('GET /api/platforms', () => {
   it('перечисляет только платформы, которые есть в базе, со счётчиком', async () => {

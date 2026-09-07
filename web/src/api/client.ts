@@ -41,8 +41,16 @@ export interface ListQuery {
   platform: string | null;
   q: string | null;
   sort: SortKey;
+  letsplay: boolean;
+  trailer: boolean;
   page: number;
   pageSize: number;
+}
+
+/** Сколько игр в базе попадает под дополнительные фильтры. */
+export interface FacetsDto {
+  withLetsplay: number;
+  withTrailer: number;
 }
 
 export function listQueryToParams(query: ListQuery): URLSearchParams {
@@ -50,6 +58,8 @@ export function listQueryToParams(query: ListQuery): URLSearchParams {
   if (query.platform) params.set('platform', query.platform);
   if (query.q) params.set('q', query.q);
   params.set('sort', query.sort);
+  if (query.letsplay) params.set('letsplay', '1');
+  if (query.trailer) params.set('trailer', '1');
   params.set('page', String(query.page));
   params.set('pageSize', String(query.pageSize));
   return params;
@@ -65,6 +75,10 @@ export function fetchGame(slug: string, signal?: AbortSignal): Promise<GameCardD
 
 export function fetchPlatforms(signal?: AbortSignal): Promise<PlatformDto[]> {
   return getJson<PlatformDto[]>('/api/platforms', signal);
+}
+
+export function fetchFacets(signal?: AbortSignal): Promise<FacetsDto> {
+  return getJson<FacetsDto>('/api/facets', signal);
 }
 
 export function fetchStatus(signal?: AbortSignal): Promise<StatusDto> {

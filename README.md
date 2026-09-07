@@ -355,9 +355,10 @@ flowchart LR
 
 | Маршрут | Что делает |
 |---|---|
-| `GET /api/games` | Список: `platform`, `q`, `sort` (`metascore`/`userscore`/`date`/`title`), `page`, `pageSize` |
+| `GET /api/games` | Список: `platform`, `q`, `sort` (`metascore`/`userscore`/`date`/`title`), `letsplay=1`, `trailer=1`, `page`, `pageSize` |
 | `GET /api/games/:slug` | Карточка: все поля, оценки по платформам, оба резюме, похожие, летсплей |
 | `GET /api/platforms` | Справочник платформ со счётчиком игр |
+| `GET /api/facets` | Сколько игр с летсплеем и с трейлером — числа для чипов |
 | `GET /api/status` | Состояние воркеров, счётчики, состояние обхода, последние события |
 | `GET /api/events` | Поток SSE: снимки состояния и события журнала |
 | `POST /api/crawl/run` | Принудительный запуск. 202 · 409 если идёт · 503 если планировщик выключен |

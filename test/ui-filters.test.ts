@@ -16,11 +16,34 @@ describe('разбор адреса', () => {
   it('берёт платформу, запрос и сортировку', () => {
     expect(
       filtersFromQuery({ platform: 'PlayStation 5', q: 'onimusha', sort: 'metascore' }),
-    ).toEqual({ platform: 'PlayStation 5', q: 'onimusha', sort: 'metascore' });
+    ).toEqual({
+      platform: 'PlayStation 5',
+      q: 'onimusha',
+      sort: 'metascore',
+      letsplay: false,
+      trailer: false,
+    });
   });
 
   it('пустой адрес — умолчания', () => {
-    expect(filtersFromQuery({})).toEqual({ platform: null, q: null, sort: 'date' });
+    expect(filtersFromQuery({})).toEqual({
+      platform: null,
+      q: null,
+      sort: 'date',
+      letsplay: false,
+      trailer: false,
+    });
+  });
+
+  it('дополнительные фильтры включаются наличием параметра', () => {
+    expect(filtersFromQuery({ letsplay: '1' })).toMatchObject({
+      letsplay: true,
+      trailer: false,
+    });
+    expect(filtersFromQuery({ letsplay: '1', trailer: '1' })).toMatchObject({
+      letsplay: true,
+      trailer: true,
+    });
   });
 
   it('негодная сортировка не роняет экран, а заменяется умолчанием', () => {
@@ -29,7 +52,7 @@ describe('разбор адреса', () => {
   });
 
   it('пустые и пробельные значения — это отсутствие значения, не пустая строка', () => {
-    expect(filtersFromQuery({ q: '   ', platform: '' })).toEqual({
+    expect(filtersFromQuery({ q: '   ', platform: '' })).toMatchObject({
       platform: null,
       q: null,
       sort: 'date',
@@ -43,35 +66,54 @@ describe('разбор адреса', () => {
 
 describe('сборка адреса', () => {
   it('умолчания в адрес не пишутся: / и /?sort=date — одна ссылка', () => {
-    expect(filtersToQuery({ platform: null, q: null, sort: 'date' })).toEqual({});
+    expect(
+      filtersToQuery({ platform: null, q: null, sort: 'date', letsplay: false, trailer: false }),
+    ).toEqual({});
   });
 
   it('непустой отбор попадает в адрес целиком', () => {
-    expect(filtersToQuery({ platform: 'PC', q: 'neon', sort: 'title' })).toEqual({
+    expect(
+      filtersToQuery({ platform: 'PC', q: 'neon', sort: 'title', letsplay: true, trailer: true }),
+    ).toEqual({
       platform: 'PC',
       q: 'neon',
       sort: 'title',
+      letsplay: '1',
+      trailer: '1',
     });
   });
 
   it('адрес и разбор обратимы', () => {
-    const filters = { platform: 'Nintendo Switch 2', q: 'zelda', sort: 'userscore' } as const;
+    const filters = {
+      platform: 'Nintendo Switch 2',
+      q: 'zelda',
+      sort: 'userscore',
+      letsplay: true,
+      trailer: false,
+    } as const;
     expect(filtersFromQuery(filtersToQuery(filters))).toEqual(filters);
   });
 });
 
 describe('служебное', () => {
   it('ключ отбора различает разные отборы и совпадает у одинаковых', () => {
-    const a = filtersKey({ platform: 'PC', q: null, sort: 'date' });
-    const b = filtersKey({ platform: 'PC', q: null, sort: 'date' });
-    const c = filtersKey({ platform: null, q: 'PC', sort: 'date' });
-    expect(a).toBe(b);
-    expect(a).not.toBe(c);
+    const base = { platform: 'PC', q: null, sort: 'date', letsplay: false, trailer: false } as const;
+    expect(filtersKey(base)).toBe(filtersKey({ ...base }));
+    expect(filtersKey(base)).not.toBe(filtersKey({ ...base, platform: null, q: 'PC' }));
+    // Дополнительные фильтры обязаны попадать в ключ: иначе при возврате из
+    // карточки восстановился бы список от другого отбора.
+    expect(filtersKey(base)).not.toBe(filtersKey({ ...base, letsplay: true }));
+    expect(filtersKey({ ...base, letsplay: true })).not.toBe(
+      filtersKey({ ...base, trailer: true }),
+    );
   });
 
   it('умолчания опознаются: от них зависит, что показать на пустом списке', () => {
-    expect(isDefaultFilters({ platform: null, q: null, sort: 'date' })).toBe(true);
-    expect(isDefaultFilters({ platform: null, q: null, sort: 'title' })).toBe(false);
+    const base = { platform: null, q: null, sort: 'date', letsplay: false, trailer: false } as const;
+    expect(isDefaultFilters(base)).toBe(true);
+    expect(isDefaultFilters({ ...base, sort: 'title' })).toBe(false);
+    expect(isDefaultFilters({ ...base, letsplay: true })).toBe(false);
+    expect(isDefaultFilters({ ...base, trailer: true })).toBe(false);
   });
 
   it('подпись сортировки — дословно из макета', () => {
