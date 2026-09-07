@@ -61,7 +61,9 @@ const staleHours = computed(() => {
   const hours = hoursSince(crawlerLastRun(status.value), Date.now());
   return hours !== null && hours >= 24 ? Math.round(hours) : null;
 });
-const staleStamp = computed(() => stampText(crawlerLastRun(status.value)));
+const staleStamp = computed(() =>
+  status.value === null ? 'неизвестно' : stampText(crawlerLastRun(status.value)),
+);
 
 async function loadPage(next: number, append: boolean): Promise<void> {
   inFlight?.abort();

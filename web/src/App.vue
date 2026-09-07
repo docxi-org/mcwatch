@@ -12,7 +12,9 @@ onMounted(() => {
 });
 
 const onMonitoring = computed(() => route.name === 'monitoring');
-const crawlStamp = computed(() => stampText(crawlerLastRun(status.value)));
+const crawlStamp = computed(() =>
+  status.value === null ? null : stampText(crawlerLastRun(status.value)),
+);
 </script>
 
 <template>
@@ -34,7 +36,7 @@ const crawlStamp = computed(() => stampText(crawlerLastRun(status.value)));
       <RouterLink v-if="onMonitoring" class="head__back mono" :to="{ name: 'list' }"
         >→ каталог</RouterLink
       >
-      <span v-else class="head__stamp mono">обход: {{ crawlStamp }}</span>
+      <span v-else-if="crawlStamp" class="head__stamp mono">обход: {{ crawlStamp }}</span>
     </header>
 
     <RouterView />
