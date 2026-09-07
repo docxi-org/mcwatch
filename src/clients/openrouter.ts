@@ -1,10 +1,15 @@
 import { setTimeout as delay } from 'node:timers/promises';
 import { createOpenRouter } from '@openrouter/ai-sdk-provider';
-import { generateText, Output } from 'ai';
+import { embedMany, generateText, Output } from 'ai';
 import { z } from 'zod';
 import { env } from '../config/env.js';
 import { SERVICE_NAME } from '../config/service.js';
-import { SUMMARY_LIMITS, SUMMARY_MODEL } from '../config/models.js';
+import {
+  EMBEDDING_DIMENSIONS,
+  EMBEDDING_MODEL,
+  SUMMARY_LIMITS,
+  SUMMARY_MODEL,
+} from '../config/models.js';
 import type { Review, ReviewKind } from './metacritic/index.js';
 
 /**
@@ -63,6 +68,7 @@ export interface SummarizeInput {
 export interface OpenRouterClientOptions {
   apiKey?: string | undefined;
   model?: string;
+  embeddingModel?: string;
   /** Таймаут одной попытки, мс. */
   timeoutMs?: number;
   /** Число попыток, включая первую. */
@@ -82,6 +88,7 @@ const DEFAULT_MAX_ATTEMPTS = 3;
 
 export class OpenRouterClient {
   private readonly model: string;
+  private readonly embeddingModel: string;
   private readonly timeoutMs: number;
   private readonly maxAttempts: number;
   private readonly provider: ReturnType<typeof createOpenRouter>;
@@ -91,6 +98,7 @@ export class OpenRouterClient {
     if (!apiKey) throw new MissingApiKeyError();
 
     this.model = opts.model ?? SUMMARY_MODEL;
+    this.embeddingModel = opts.embeddingModel ?? EMBEDDING_MODEL;
     this.timeoutMs = opts.timeoutMs ?? DEFAULT_TIMEOUT_MS;
     this.maxAttempts = opts.maxAttempts ?? DEFAULT_MAX_ATTEMPTS;
     this.provider = createOpenRouter({
@@ -140,10 +148,33 @@ export class OpenRouterClient {
     throw lastErr;
   }
 
+  /**
+   * Эмбеддинги пачкой. Размерность усечённая: модель матрёшечная, 1536 из
+   * родных 2560 (§4). Порядок ответа соответствует порядку входа.
+   */
+  async embed(texts: string[]): Promise<Float32Array[]> {
+    if (texts.length === 0) return [];
+
+    const { embeddings } = await this.withRetries(() =>
+      embedMany({
+        model: this.provider.textEmbeddingModel(this.embeddingModel),
+        values: texts,
+        providerOptions: { openrouter: { dimensions: EMBEDDING_DIMENSIONS } },
+        // Тот же порядок, что и у резюме: свой таймаут на каждую попытку.
+        abortSignal: AbortSignal.timeout(this.timeoutMs),
+        maxRetries: 0,
+      }),
+    );
+
+    if (embeddings.length !== texts.length) {
+      throw new Error(
+        `OpenRouter вернул ${embeddings.length} эмбеддингов на ${texts.length} текстов`,
+      );
+    }
+    return embeddings.map((e) => Float32Array.from(e));
+  }
+
   private async generateOnce(prompt: string): Promise<ReviewSummary> {
-    // `generateObject` в AI SDK v7 объявлен устаревшим; структурированный
-    // вывод по zod-схеме теперь даёт `generateText` с `Output.object`.
-    // Замысел из CLAUDE.md сохранён, изменилось только имя вызова.
     const { output } = await generateText({
       model: this.provider.chat(this.model),
       output: Output.object({ schema: summarySchema }),

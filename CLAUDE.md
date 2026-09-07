@@ -53,7 +53,8 @@ YouTube, библиотека) — в `docs/ARCHITECTURE.md`, не в реест
   не подключать.
 - **LLM только через OpenRouter** одним ключом, через Vercel AI SDK
   (`ai` + `@openrouter/ai-sdk-provider`). Структурированный вывод —
-  `generateObject` + zod. Модели — константы в одном конфиге, не в коде вызовов.
+  `generateText` + `Output.object` + zod (в AI SDK v7 `generateObject` устарел).
+  Модели — константы в одном конфиге, не в коде вызовов.
 - **Транскрипция:** субтитры YouTube; Whisper (OpenRouter
   `/audio/transcriptions`) — только если субтитров нет.
 - **Летсплей-часть линейная**, не агентная.
@@ -89,6 +90,7 @@ pnpm check          # typecheck + lint + test  ← гейт
 pnpm test:live      # сетевые тесты (вручную)
 pnpm crawl --once   # один цикл сбора
 pnpm summarize --once  # один прогон резюме отзывов
+pnpm embed --once   # эмбеддинги; --show N печатает похожие игры
 pnpm db:migrate
 ```
 

@@ -1,5 +1,5 @@
 import { createHash } from 'node:crypto';
-import { and, eq, notInArray } from 'drizzle-orm';
+import { and, eq, notInArray, sql } from 'drizzle-orm';
 import type { GameCard } from '../../clients/metacritic/index.js';
 import type { Db } from '../index.js';
 import { gamePlatforms, games } from '../schema.js';
@@ -55,7 +55,18 @@ export function upsertGame(db: Db, card: GameCard, now: Date): void {
 
   db.insert(games)
     .values({ ...row, firstSeen: now })
-    .onConflictDoUpdate({ target: games.slug, set: row })
+    .onConflictDoUpdate({
+      target: games.slug,
+      set: {
+        ...row,
+        // Материал эмбеддинга изменился — старый вектор недействителен.
+        // Обнуляем здесь, чтобы воркеру эмбеддингов хватало условия
+        // «embedding IS NULL» и не заводить второй хеш (§4.2).
+        // `IS NOT` в SQLite сравнивает с учётом NULL.
+        embedding: sql`CASE WHEN excluded.description_hash IS NOT ${games.descriptionHash}
+                            THEN NULL ELSE ${games.embedding} END`,
+      },
+    })
     .run();
 }
 
