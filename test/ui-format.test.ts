@@ -6,6 +6,7 @@ import {
   durationText,
   hoursSince,
   plural,
+  stampHuman,
   stampText,
   viewsText,
 } from '../web/src/lib/format.js';
@@ -28,6 +29,11 @@ describe('даты', () => {
   it('отметка обхода — по часам UTC', () => {
     expect(stampText('2026-09-07T13:05:00.000Z')).toBe('07.09.2026 13:05');
     expect(stampText(null)).toBe('ещё не было');
+  });
+
+  it('в полосе устаревшего обхода время читается словами — как в макете', () => {
+    expect(stampHuman('2026-09-06T04:00:00.000Z')).toBe('6 сентября в 04:00');
+    expect(stampHuman(null)).toBe('ещё не было');
   });
 });
 

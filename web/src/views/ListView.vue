@@ -4,7 +4,7 @@ import { onBeforeRouteLeave, useRoute, useRouter } from 'vue-router';
 import { ApiError, fetchGames, fetchPlatforms } from '../api/client.js';
 import type { GameListItemDto, PlatformDto, SortKey } from '../api/types.js';
 import GameTile from '../components/GameTile.vue';
-import { countText, hoursSince, stampText } from '../lib/format.js';
+import { hoursSince, plural, stampHuman, stampText } from '../lib/format.js';
 import { saveList, takeList } from '../lib/listCache.js';
 import {
   PAGE_SIZE,
@@ -35,6 +35,8 @@ const loading = ref(false);
 const firstLoad = ref(true);
 const failure = ref<ApiError | null>(null);
 const platforms = ref<PlatformDto[]>([]);
+/** Всего игр в базе — число для чипа «Все платформы», как в макете. */
+const baseTotal = ref<number | null>(null);
 
 /** Черновик поиска: в адрес он уезжает с задержкой, иначе история засоряется. */
 const draft = ref('');
@@ -47,11 +49,19 @@ const loadedAll = computed(() => items.value.length >= total.value);
 const hasFilters = computed(() => !isDefaultFilters(filters.value));
 
 const countLine = computed(() => {
-  const shown = items.value.length;
   const all = total.value;
-  const word = countText(all, 'игра', 'игры', 'игр');
-  return shown >= all ? word : `показано ${shown} из ${all}`;
+  const shown = Math.min(items.value.length, all);
+  return `${all} ${plural(all, 'игра', 'игры', 'игр')} по отбору · показано ${shown}`;
 });
+
+/** Чипы платформ идут по числу игр, а не по алфавиту (макет). */
+const platformChips = computed(() =>
+  [...platforms.value].sort((a, b) => b.gameCount - a.gameCount),
+);
+
+const moreText = computed(
+  () => `Показать ещё ${Math.min(PAGE_SIZE, Math.max(0, total.value - items.value.length))}`,
+);
 
 /**
  * Обход раз в час. Если последний удачный был больше суток назад, данные в
@@ -64,6 +74,8 @@ const staleHours = computed(() => {
 const staleStamp = computed(() =>
   status.value === null ? 'неизвестно' : stampText(crawlerLastRun(status.value)),
 );
+const staleWhen = computed(() => stampHuman(crawlerLastRun(status.value)));
+const hoursWord = computed(() => plural(staleHours.value ?? 0, 'час', 'часа', 'часов'));
 
 async function loadPage(next: number, append: boolean): Promise<void> {
   inFlight?.abort();
@@ -136,6 +148,21 @@ function resetFilters(): void {
   void router.push({ name: 'list' });
 }
 
+/**
+ * Сколько колонок в сетке сейчас. Нужно только заглушкам: в макете их ровно
+ * два ряда на первой загрузке и один ряд на догрузке, а «десять всегда» на
+ * телефоне давало пять экранов пустых плиток.
+ */
+const cols = ref(2);
+
+function syncCols(): void {
+  cols.value = window.matchMedia('(min-width: 1120px)').matches
+    ? 5
+    : window.matchMedia('(min-width: 640px)').matches
+      ? 3
+      : 2;
+}
+
 // ── Подгрузка при прокрутке ────────────────────────────────────────────────
 
 const sentinel = ref<HTMLElement | null>(null);
@@ -160,6 +187,8 @@ watch(sentinel, watchSentinel);
 // ── Жизненный цикл ─────────────────────────────────────────────────────────
 
 onMounted(() => {
+  syncCols();
+  window.addEventListener('resize', syncCols);
   draft.value = filters.value.q ?? '';
   void fetchPlatforms()
     .then((list) => {
@@ -168,6 +197,16 @@ onMounted(() => {
     .catch(() => {
       // Без справочника платформ список всё равно работает — просто без чипов.
       platforms.value = [];
+    });
+
+  // Отдельный лёгкий запрос: счётчик на чипе «Все платформы» — это число игр
+  // в базе, а сумма по платформам его не даёт (игра стоит на нескольких).
+  void fetchGames({ platform: null, q: null, sort: 'title', page: 1, pageSize: 1 })
+    .then((result) => {
+      baseTotal.value = result.total;
+    })
+    .catch(() => {
+      baseTotal.value = null;
     });
 
   const restored = takeList(key.value);
@@ -207,6 +246,7 @@ onBeforeRouteLeave((to) => {
 onBeforeUnmount(() => {
   observer?.disconnect();
   inFlight?.abort();
+  window.removeEventListener('resize', syncCols);
   if (draftTimer) clearTimeout(draftTimer);
 });
 </script>
@@ -216,8 +256,8 @@ onBeforeUnmount(() => {
     <div v-if="staleHours !== null" class="stale" role="status">
       <span class="stale__badge mono">{{ staleHours }} Ч</span>
       <span class="stale__text"
-        >Последний удачный обход был {{ staleStamp }} UTC — больше суток назад. Сервис ходит на
-        Metacritic раз в час, так что свежих релизов в списке может не хватать.</span
+        >Последний удачный обход — {{ staleWhen }} UTC, {{ staleHours }}
+        {{ hoursWord }} назад. Свежие релизы Metacritic могут в каталоге ещё не появиться.</span
       >
     </div>
 
@@ -255,10 +295,12 @@ onBeforeUnmount(() => {
         :aria-pressed="filters.platform === null"
         @click="pickPlatform(null)"
       >
-        все платформы
+        Все платформы<span v-if="baseTotal !== null" class="chip__count mono">{{
+          baseTotal
+        }}</span>
       </button>
       <button
-        v-for="p in platforms"
+        v-for="p in platformChips"
         :key="p.platform"
         type="button"
         class="chip"
@@ -275,15 +317,16 @@ onBeforeUnmount(() => {
       <span class="failure__code mono">{{ failure.status === 0 ? 'нет связи' : failure.status }}</span>
       <span class="failure__title">Сервис не ответил</span>
       <span class="failure__note"
-        >С каталогом всё в порядке — не ответил сервер. Отбор сохранён, попробуйте ещё раз.</span
+        >Сбой на нашей стороне, с каталогом всё в порядке. Обычно проходит за минуту — попробуйте
+        обновить страницу.</span
       >
       <button type="button" class="btn btn--primary" @click="reload">Обновить</button>
-      <span class="failure__tech mono">{{ failure.message }}</span>
+      <span class="failure__tech mono">GET /api/games → {{ failure.message }}</span>
     </div>
 
     <template v-else>
       <div v-if="firstLoad" class="grid" aria-hidden="true">
-        <div v-for="n in 10" :key="n" class="skeleton">
+        <div v-for="n in cols * 2" :key="n" class="skeleton">
           <div class="skeleton__cover"></div>
           <div class="skeleton__body">
             <span class="skeleton__line skeleton__line--wide"></span>
@@ -302,27 +345,44 @@ onBeforeUnmount(() => {
 
         <div class="grid">
           <GameTile v-for="game in items" :key="game.slug" :game="game" />
+          <!--
+            Догрузка обязана быть видимой: ряд заглушек говорит, что страница
+            уже едет, — иначе карточки появляются молча (макет, `skelCount`).
+          -->
+          <div
+            v-for="n in loading ? cols : 0"
+            :key="`skeleton-${n}`"
+            class="skeleton"
+            aria-hidden="true"
+          >
+            <div class="skeleton__cover"></div>
+            <div class="skeleton__body">
+              <span class="skeleton__line skeleton__line--wide"></span>
+              <span class="skeleton__line"></span>
+              <span class="skeleton__line skeleton__line--short"></span>
+              <span class="skeleton__box"></span>
+            </div>
+          </div>
         </div>
 
         <div ref="sentinel" class="sentinel" aria-hidden="true"></div>
 
-        <div v-if="!loadedAll" class="more">
-          <button type="button" class="btn" :disabled="loading" @click="loadMore">
-            {{ loading ? 'загружаем…' : 'Показать ещё' }}
-          </button>
+        <div v-if="!loadedAll && !loading" class="more">
+          <button type="button" class="btn" @click="loadMore">{{ moreText }}</button>
         </div>
-        <div v-else class="done mono">это все игры по текущему отбору</div>
+        <div v-else-if="loadedAll" class="done mono">это все игры по текущему отбору</div>
       </template>
 
       <!-- Пусто по отбору и пусто в базе — разные вещи, и говорим о них разное. -->
       <div v-else-if="hasFilters" class="empty empty--big">
-        <span class="empty__title">Ничего не нашлось</span>
-        <span class="empty__note">
-          <template v-if="filters.q">По запросу «{{ filters.q }}» </template>
-          <template v-else>По выбранной платформе </template>
-          в каталоге нет ни одной игры. Поиск идёт только по названию игры — не по разработчику,
-          жанру или тексту отзывов.
-        </span>
+        <span class="empty__title">{{
+          filters.q ? `По запросу «${filters.q}» ничего не нашлось` : 'Под этот отбор игр нет'
+        }}</span>
+        <span class="empty__note">{{
+          filters.q
+            ? 'Поиск идёт только по названию игры и не учитывает описания. Проверьте раскладку или снимите фильтр по платформе.'
+            : 'Попробуйте выбрать другую платформу.'
+        }}</span>
         <button type="button" class="btn" @click="resetFilters">Сбросить отбор</button>
       </div>
 
@@ -410,6 +470,10 @@ onBeforeUnmount(() => {
   border-radius: 8px;
 }
 
+/*
+ * Акцентом залит выбранный чип платформы, а сортировка — приглушённая
+ * плашка. Так в макете: два ярких пятна на одном экране спорили бы.
+ */
 .sort {
   border: none;
   border-radius: var(--r-sm);
@@ -418,7 +482,7 @@ onBeforeUnmount(() => {
   font-size: 12.5px;
   white-space: nowrap;
   background: transparent;
-  color: var(--text-3);
+  color: var(--muted);
 }
 
 .sort:hover {
@@ -426,9 +490,8 @@ onBeforeUnmount(() => {
 }
 
 .sort--on {
-  background: var(--accent);
-  color: var(--bg);
-  font-weight: 600;
+  background: #2a2a31;
+  color: #f2f3f5;
 }
 
 .chips {
@@ -449,7 +512,7 @@ onBeforeUnmount(() => {
   font-size: 13px;
   border: 1px solid #2a2a30;
   background: #151518;
-  color: var(--text-3);
+  color: #c6c7cd;
   white-space: nowrap;
 }
 
@@ -459,8 +522,8 @@ onBeforeUnmount(() => {
 
 .chip--on {
   border-color: var(--accent);
-  background: rgba(60, 150, 180, 0.14);
-  color: var(--accent);
+  background: var(--accent);
+  color: var(--bg);
 }
 
 .chip__count {
@@ -474,7 +537,7 @@ onBeforeUnmount(() => {
   justify-content: space-between;
   gap: 12px;
   font-size: 11px;
-  color: var(--muted-2);
+  color: #6f6f77;
   padding: 4px 0 14px;
 }
 
@@ -484,15 +547,10 @@ onBeforeUnmount(() => {
   gap: 16px;
 }
 
+/* Три ширины макета: 390 → 2, 834 → 3, 1280 → 5. Промежуточных нет. */
 @media (min-width: 640px) {
   .grid {
     grid-template-columns: repeat(3, minmax(0, 1fr));
-  }
-}
-
-@media (min-width: 900px) {
-  .grid {
-    grid-template-columns: repeat(4, minmax(0, 1fr));
   }
 }
 

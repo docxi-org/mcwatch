@@ -68,7 +68,8 @@ const view = computed(() => scoreView(props.kind, props.value));
   font-family: var(--mono);
   font-weight: 700;
   line-height: 1;
-  border-radius: var(--r-sm);
+  /* 7 px — из макета; общий --r-sm (6) плашке чуть тесноват. */
+  border-radius: 7px;
   background: rgba(255, 255, 255, 0.045);
   border: 2px solid transparent;
   color: var(--tone);

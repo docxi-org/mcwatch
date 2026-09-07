@@ -108,11 +108,14 @@ const hasAnySummary = computed(
       <span class="fail__code mono">404</span>
       <span class="fail__title">Такой игры в каталоге нет</span>
       <span class="fail__note"
-        >В базе только то, что сервис успел собрать: он обходит Metacritic раз в час и берёт новые
-        релизы. Возможно, эта игра ещё не попала в обход или ссылка устарела.</span
+        >Адрес мог устареть, или игру ещё не собрал обход Metacritic. Проверить стоит по списку —
+        он обновляется раз в час.</span
       >
       <RouterLink class="btn btn--primary fail__btn" :to="{ name: 'list' }"
         >Ко всем играм</RouterLink
+      >
+      <span class="fail__tech mono"
+        >GET /api/games/{{ props.slug }} → 404 {"error":"not_found"}</span
       >
     </div>
 
@@ -120,12 +123,13 @@ const hasAnySummary = computed(
       <span class="fail__code mono">{{ failure.status === 0 ? 'нет связи' : failure.status }}</span>
       <span class="fail__title">Сервис не ответил</span>
       <span class="fail__note"
-        >С каталогом всё в порядке — не ответил сервер. Попробуйте открыть карточку ещё раз.</span
+        >Сбой на нашей стороне, с каталогом всё в порядке. Обычно проходит за минуту — попробуйте
+        обновить страницу.</span
       >
       <button type="button" class="btn btn--primary fail__btn" @click="load(props.slug)">
         Обновить
       </button>
-      <span class="fail__tech mono">{{ failure.message }}</span>
+      <span class="fail__tech mono">GET /api/games/{{ props.slug }} → {{ failure.message }}</span>
     </div>
 
     <template v-else-if="game">
@@ -322,7 +326,7 @@ const hasAnySummary = computed(
   flex-direction: column;
   gap: 1px;
   border: 1px solid var(--border);
-  border-radius: var(--r-md);
+  border-radius: 10px;
   overflow: hidden;
 }
 
@@ -359,7 +363,7 @@ const hasAnySummary = computed(
   width: 100%;
   background-color: #1b1b20;
   border: 1px solid var(--border);
-  border-radius: var(--r-md);
+  border-radius: 10px;
   display: grid;
   place-items: center;
 }
@@ -406,7 +410,7 @@ const hasAnySummary = computed(
 
 @media (min-width: 820px) {
   .head__title {
-    font-size: 34px;
+    font-size: 38px;
   }
 }
 
@@ -492,7 +496,8 @@ const hasAnySummary = computed(
   gap: 14px;
 }
 
-@media (min-width: 1000px) {
+/* В макете две колонки резюме только на десктопе; на планшете — одна. */
+@media (min-width: 1120px) {
   .summaries {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }

@@ -9,11 +9,11 @@ import type { SortKey } from '../api/types.js';
 export const DEFAULT_SORT: SortKey = 'date';
 export const PAGE_SIZE = 24;
 
-export const SORTS: { key: SortKey; label: string; note: string }[] = [
-  { key: 'date', label: 'по дате', note: 'сначала свежие релизы' },
-  { key: 'metascore', label: 'по метаскору', note: 'сначала лучшие у критиков' },
-  { key: 'userscore', label: 'по игрокам', note: 'сначала лучшие у игроков' },
-  { key: 'title', label: 'по названию', note: 'по алфавиту' },
+export const SORTS: { key: SortKey; label: string }[] = [
+  { key: 'date', label: 'по дате' },
+  { key: 'metascore', label: 'по метаскору' },
+  { key: 'userscore', label: 'по игрокам' },
+  { key: 'title', label: 'по названию' },
 ];
 
 export interface ListFilters {
@@ -66,6 +66,8 @@ export function isDefaultFilters(filters: ListFilters): boolean {
   return filters.platform === null && filters.q === null && filters.sort === DEFAULT_SORT;
 }
 
+/** Подпись справа над сеткой — дословно из макета: «сортировка: по дате». */
 export function sortNote(sort: SortKey): string {
-  return SORTS.find((s) => s.key === sort)?.note ?? '';
+  const label = SORTS.find((s) => s.key === sort)?.label;
+  return label ? `сортировка: ${label}` : '';
 }

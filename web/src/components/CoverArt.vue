@@ -42,7 +42,7 @@ watch(
     <div v-else class="cover__stub">
       <span class="cover__title">{{ props.title }}</span>
       <span class="cover__note">{{
-        broken ? 'ССЫЛКА НА ОБЛОЖКУ НЕ ОТКРЫЛАСЬ' : 'ОБЛОЖКИ НЕТ'
+        broken ? 'ССЫЛКА НЕ ОТКРЫЛАСЬ' : 'ОБЛОЖКИ НЕТ'
       }}</span>
     </div>
   </div>

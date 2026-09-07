@@ -59,15 +59,10 @@ defineProps<{ games: SimilarGameDto[] }>();
   gap: 12px;
 }
 
+/* Макет: 2 колонки на мобильном, 4 на планшете и десктопе. */
 @media (min-width: 640px) {
   .similar {
-    grid-template-columns: repeat(3, minmax(0, 1fr));
-  }
-}
-
-@media (min-width: 900px) {
-  .similar {
-    grid-template-columns: repeat(5, minmax(0, 1fr));
+    grid-template-columns: repeat(4, minmax(0, 1fr));
   }
 }
 
@@ -76,7 +71,7 @@ defineProps<{ games: SimilarGameDto[] }>();
   flex-direction: column;
   background: var(--surface);
   border: 1px solid var(--border);
-  border-radius: var(--r-md);
+  border-radius: 10px;
   overflow: hidden;
   color: inherit;
 }

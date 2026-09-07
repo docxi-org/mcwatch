@@ -4,6 +4,7 @@ import {
   filtersKey,
   filtersToQuery,
   isDefaultFilters,
+  sortNote,
 } from '../web/src/lib/listFilters.js';
 
 /**
@@ -71,5 +72,10 @@ describe('служебное', () => {
   it('умолчания опознаются: от них зависит, что показать на пустом списке', () => {
     expect(isDefaultFilters({ platform: null, q: null, sort: 'date' })).toBe(true);
     expect(isDefaultFilters({ platform: null, q: null, sort: 'title' })).toBe(false);
+  });
+
+  it('подпись сортировки — дословно из макета', () => {
+    expect(sortNote('date')).toBe('сортировка: по дате');
+    expect(sortNote('metascore')).toBe('сортировка: по метаскору');
   });
 });

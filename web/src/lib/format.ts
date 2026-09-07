@@ -62,6 +62,16 @@ export function stampText(iso: string | null): string {
   );
 }
 
+/** «6 сентября в 04:00» — как в макете, для полосы устаревшего обхода. */
+export function stampHuman(iso: string | null): string {
+  if (!iso) return 'ещё не было';
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return 'ещё не было';
+  const p = (n: number): string => String(n).padStart(2, '0');
+  const day = dateText(iso.slice(0, 10));
+  return `${day.replace(/ \d{4}$/, '')} в ${p(d.getUTCHours())}:${p(d.getUTCMinutes())}`;
+}
+
 /** «5 мин назад». `now` передаётся снаружи: часы сервера точнее браузерных. */
 export function agoText(iso: string | null, now: number): string {
   if (!iso) return 'ещё не работал';

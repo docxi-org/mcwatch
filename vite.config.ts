@@ -17,10 +17,13 @@ export default defineConfig({
     assetsInlineLimit: 2048,
   },
   server: {
-    port: 5173,
+    port: Number(process.env['WEB_PORT'] ?? 5173),
     proxy: {
+      // Порт бэкенда берётся из того же `PORT`, что читает сервер: на машине
+      // разработчика 3000 бывает занят соседним проектом, и прокси не должен
+      // молча стучаться в чужой сервис.
       '/api': {
-        target: 'http://127.0.0.1:3000',
+        target: `http://127.0.0.1:${process.env['PORT'] ?? '3000'}`,
         changeOrigin: true,
       },
     },

@@ -97,7 +97,7 @@ const crawlStamp = computed(() =>
 
 .head__stamp {
   font-size: 11px;
-  color: var(--muted-2);
+  color: #6f6f77;
 }
 
 /* Служебный вход: заметен тому, кто его ищет, и не спорит с каталогом. */
