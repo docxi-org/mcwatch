@@ -1,7 +1,9 @@
 {
   "compilerOptions": {
-    "target": "ES2023",
-    "lib": ["ES2023"],
+    // Node 22 поддерживает ES2024 целиком (Promise.withResolvers,
+    // Object.groupBy и прочее), занижать уровень незачем.
+    "target": "ES2024",
+    "lib": ["ES2024"],
     "module": "NodeNext",
     "moduleResolution": "NodeNext",
     "types": ["node"],

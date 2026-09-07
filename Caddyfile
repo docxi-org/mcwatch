@@ -1,0 +1,11 @@
+# HTTPS выдаёт Caddy: с настоящим доменом — сертификат Let's Encrypt,
+# с `localhost` — самоподписанный, чтобы compose проверялся локально.
+{$DOMAIN} {
+	encode zstd gzip
+	reverse_proxy app:3000
+
+	log {
+		output stdout
+		format json
+	}
+}

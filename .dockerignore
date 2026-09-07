@@ -1,0 +1,12 @@
+node_modules
+dist
+data
+.env
+.env.local
+.git
+*.log
+test
+docs
+drizzle.config.ts
+vitest*.config.ts
+eslint.config.js

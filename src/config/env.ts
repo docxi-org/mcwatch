@@ -18,6 +18,15 @@ const envSchema = z.object({
   OPENROUTER_API_KEY: z.string().min(1).optional(),
   /** Контакт в User-Agent при обращении к Metacritic (CLAUDE.md, правила кода). */
   CONTACT_EMAIL: z.email().default('mcwatch@example.com'),
+  /** Включать ли часовой планировщик внутри процесса. */
+  SCHEDULER_ENABLED: z
+    .enum(['true', 'false'])
+    .default('true')
+    .transform((v) => v === 'true'),
+  /** Интервал цикла в минутах. 60 по ТЗ; меньше — только для проверок. */
+  SCHEDULER_INTERVAL_MIN: z.coerce.number().int().min(1).default(60),
+  /** Каталог собранного фронта. Раздаётся, только если существует. */
+  WEB_DIST: z.string().min(1).default('./web/dist'),
 });
 
 export type Env = z.infer<typeof envSchema>;
