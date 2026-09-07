@@ -13,6 +13,7 @@ import {
   loadSimilarityPool,
 } from '../src/db/repo/embeddings.js';
 import { upsertGame } from '../src/db/repo/games.js';
+import { asCall } from './llmCall.js';
 import { games } from '../src/db/schema.js';
 import { runEmbedOnce, embeddingTextOf } from '../src/workers/embedder.js';
 import {
@@ -199,7 +200,7 @@ function fakeEmbedder() {
   const batches: string[][] = [];
   const embed = vi.fn((texts: string[]) => {
     batches.push(texts);
-    return Promise.resolve(texts.map((_, i) => Float32Array.from([i, 1, 0])));
+    return Promise.resolve(asCall(texts.map((_, i) => Float32Array.from([i, 1, 0]))));
   });
   return { client: { embed } as unknown as OpenRouterClient, batches };
 }
@@ -268,7 +269,7 @@ describe('воркер эмбеддингов', () => {
         call++;
         return call === 1
           ? Promise.reject(new Error('провайдер лёг'))
-          : Promise.resolve(texts.map(() => Float32Array.from([1, 0, 0])));
+          : Promise.resolve(asCall(texts.map(() => Float32Array.from([1, 0, 0]))));
       }),
     } as unknown as OpenRouterClient;
 

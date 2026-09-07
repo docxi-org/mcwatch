@@ -26,6 +26,8 @@ const EXPECTED_TABLES: Record<string, string[]> = {
   jobs: ['id'],
   worker_status: ['worker'],
   events_log: ['id'],
+  llm_runs: ['id'],
+  letsplay_candidates: ['id'],
 };
 
 let dir: string;

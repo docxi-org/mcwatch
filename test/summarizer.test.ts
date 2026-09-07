@@ -16,6 +16,7 @@ import {
   selectForSummary,
   SUMMARY_INPUT_LIMIT,
 } from '../src/workers/selectReviews.js';
+import { asCall } from './llmCall.js';
 import { Monitor } from '../src/workers/monitor.js';
 import { runSummarizeOnce } from '../src/workers/summarizer.js';
 
@@ -99,7 +100,7 @@ function fakeLlm(over: Partial<{ fail: Set<string> }> = {}) {
       if (over.fail?.has(input.kind)) {
         return Promise.reject(new Error('модель недоступна'));
       }
-      return Promise.resolve(ANSWER);
+      return Promise.resolve(asCall(ANSWER));
     },
   );
   return { client: { summarizeReviews } as unknown as OpenRouterClient, calls };

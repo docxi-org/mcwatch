@@ -41,3 +41,27 @@ export const SUMMARY_LIMITS = {
   /** До скольких знаков режется отзыв на входе (§4.1). */
   maxReviewChars: 600,
 } as const;
+
+/**
+ * Прайс OpenRouter на 07.09.2026, доллары за миллион токенов. Нужен только
+ * для оценки стоимости в карточке конвейера: фактическую цену провайдер
+ * отдаёт отдельным запросом, и гонять его ради копеек на каждый вызов
+ * незачем. Поэтому в интерфейсе это подписано оценкой, а не фактом.
+ */
+export const MODEL_PRICES: Record<string, { input: number; output: number }> = {
+  'z-ai/glm-4.7-flash': { input: 0.05, output: 0.4 },
+  'qwen/qwen3-embedding-4b': { input: 0.01, output: 0 },
+  'qwen/qwen3-asr-1.7b': { input: 0.02, output: 0.02 },
+};
+
+/** Оценка стоимости вызова. `null` — модели нет в прайсе, врать не станем. */
+export function estimateCostUsd(
+  model: string,
+  promptTokens: number | null,
+  completionTokens: number | null,
+): number | null {
+  const price = MODEL_PRICES[model];
+  if (!price || promptTokens === null) return null;
+  const out = completionTokens ?? 0;
+  return (promptTokens * price.input + out * price.output) / 1_000_000;
+}

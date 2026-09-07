@@ -1,6 +1,7 @@
 import { Hono } from 'hono';
 import { createCatalogRoutes } from '../api/games.js';
 import { createMonitoringRoutes } from '../api/monitoring.js';
+import { createPipelineRoutes } from '../api/pipeline.js';
 import { componentLogger } from '../config/logger.js';
 import { SERVICE_NAME } from '../config/service.js';
 import type { Db } from '../db/index.js';
@@ -38,7 +39,10 @@ export function createApp(deps: AppDeps = {}): Hono {
 
   // Каталог подключается только когда есть БД: `/api/health` должен отвечать
   // и без неё, иначе проверка живости зависела бы от состояния хранилища.
-  if (db) app.route('/api', createCatalogRoutes(db));
+  if (db) {
+    app.route('/api', createCatalogRoutes(db));
+    app.route('/api', createPipelineRoutes(db));
+  }
   if (db && monitor) {
     app.route('/api', createMonitoringRoutes({ db, monitor, scheduler: scheduler ?? null }));
   }

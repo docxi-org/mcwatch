@@ -24,7 +24,8 @@
     "letsplay": "tsx src/cli/letsplay.ts",
     "dev:api": "tsx watch src/server/index.ts",
     "dev:web": "vite",
-    "build:web": "vite build"
+    "build:web": "vite build",
+    "rebuild": "tsx src/cli/rebuild.ts"
   },
   "dependencies": {
     "@hono/node-server": "^2.1.1",

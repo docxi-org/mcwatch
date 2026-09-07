@@ -1,10 +1,11 @@
 import { and, count, eq } from 'drizzle-orm';
 import type { Logger } from 'pino';
 import type { Review, ReviewKind } from '../clients/metacritic/index.js';
-import type { OpenRouterClient } from '../clients/openrouter.js';
+import { failedMeta, type OpenRouterClient } from '../clients/openrouter.js';
 import { SUMMARY_MODEL } from '../config/models.js';
 import { componentLogger } from '../config/logger.js';
 import type { Db } from '../db/index.js';
+import { recordRun } from '../db/repo/llmRuns.js';
 import { games, reviews } from '../db/schema.js';
 import {
   getSummary,
@@ -149,7 +150,7 @@ export async function runSummarizeOnce(
       // Модели уходит выборка, а не всё хранилище (§4.1): у иных игр отзывов
       // под сотню, и слать их целиком — лишние деньги и минуты.
       const input = selectForSummary(list, c.kind);
-      const summary = await client.summarizeReviews({
+      const call = await client.summarizeReviews({
         title: c.title,
         kind: c.kind,
         reviews: input,
@@ -157,7 +158,21 @@ export async function runSummarizeOnce(
 
       // Запоминаем полное число отзывов, а не размер выборки: правило
       // обновления следит за ростом хранилища.
-      upsertSummary(db, c.slug, c.kind, summary, model, list.length, now());
+      upsertSummary(db, c.slug, c.kind, call.value, model, list.length, now());
+
+      recordRun(
+        db,
+        {
+          gameSlug: c.slug,
+          stage: c.kind === 'critic' ? 'summary_critic' : 'summary_user',
+          meta: call.meta,
+          output: call.value,
+          decision:
+            `резюме сохранено · причина пересчёта: ${reason} · ` +
+            `в модель ушло ${input.length} отзывов из ${list.length}`,
+        },
+        now(),
+      );
       result.written++;
       result.reasons[reason] = (result.reasons[reason] ?? 0) + 1;
       report.processed(WORKER);
@@ -167,6 +182,18 @@ export async function runSummarizeOnce(
       result.failed++;
       result.failures.push({ slug: c.slug, kind: c.kind, error: message });
       report.failed(WORKER);
+      recordRun(
+        db,
+        {
+          gameSlug: c.slug,
+          stage: c.kind === 'critic' ? 'summary_critic' : 'summary_user',
+          meta: failedMeta(model),
+          output: null,
+          decision: 'резюме не сделано, игра пропущена',
+          error: message,
+        },
+        now(),
+      );
       report.log(WORKER, 'warn', `резюме не сделано: ${c.slug} · ${c.kind}`, {
         error: message,
       });

@@ -13,6 +13,8 @@ import {
   saveLetsplay,
   type PendingGame,
 } from '../db/repo/letsplays.js';
+import { replaceCandidates, type CandidateRow } from '../db/repo/letsplayCandidates.js';
+import { recordRun } from '../db/repo/llmRuns.js';
 import { nullReporter, type Reporter } from './monitor.js';
 
 /**
@@ -68,6 +70,7 @@ async function pickVideo(
   candidates: VideoCandidate[],
   rejected: RejectedCandidate[],
   log: Logger,
+  now: () => Date,
 ): Promise<Attempt | null> {
   const gameInfo = {
     title: game.title,
@@ -76,7 +79,33 @@ async function pickVideo(
     description: game.description,
   };
 
-  for (const video of candidates.slice(0, LETSPLAY_LIMITS.maxCandidates)) {
+  // Все рассмотренные кандидаты сохраняются — и взятый, и отбракованные:
+  // иначе причина отказа живёт только в журнале и исчезает при ротации (§10).
+  const seen: CandidateRow[] = [];
+  let picked: Attempt | null = null;
+
+  for (const [i, video] of candidates.slice(0, LETSPLAY_LIMITS.maxCandidates).entries()) {
+    const base = {
+      position: i + 1,
+      videoId: video.id,
+      title: video.title,
+      channel: video.channel,
+      views: video.views,
+      durationS: video.durationS,
+    };
+
+    if (picked) {
+      seen.push({
+        ...base,
+        transcript: null,
+        matches: null,
+        confidence: null,
+        reason: null,
+        outcome: 'не рассматривался: подходящий уже найден',
+      });
+      continue;
+    }
+
     let transcript: string;
     try {
       transcript = await deps.youtube.fetchTranscript(video.id);
@@ -86,19 +115,58 @@ async function pickVideo(
       const reason =
         err instanceof TranscriptUnavailableError ? 'нет расшифровки' : String(err).slice(0, 80);
       rejected.push({ videoId: video.id, title: video.title, reason });
+      seen.push({
+        ...base,
+        transcript: null,
+        matches: null,
+        confidence: null,
+        reason,
+        outcome: 'нет расшифровки',
+      });
       continue;
     }
 
-    const verdict = await deps.llm.judgeVideoMatch(
+    const call = await deps.llm.judgeVideoMatch(
       gameInfo,
       { title: video.title, channel: video.channel },
       transcript,
     );
+    const verdict = call.value;
 
     // `low` — сомнение, а не приговор: на нём судья ошибался чаще всего (§6).
-    if (verdict.matches && verdict.confidence !== 'low') {
+    const accepted = verdict.matches && verdict.confidence !== 'low';
+    const outcome = accepted
+      ? 'взят'
+      : verdict.matches
+        ? 'отбракован: судья сомневается'
+        : 'отбракован: другая игра';
+
+    recordRun(
+      deps.db,
+      {
+        gameSlug: game.slug,
+        stage: 'letsplay_judge',
+        subject: video.id,
+        meta: call.meta,
+        output: verdict,
+        decision: outcome,
+      },
+      now(),
+    );
+
+    seen.push({
+      ...base,
+      transcript,
+      matches: verdict.matches,
+      confidence: verdict.confidence,
+      reason: verdict.reason,
+      outcome,
+    });
+
+    if (accepted) {
       log.debug({ slug: game.slug, videoId: video.id, verdict }, 'кандидат принят');
-      return { video, transcript };
+      picked = { video, transcript };
+      continue;
     }
 
     rejected.push({
@@ -108,7 +176,8 @@ async function pickVideo(
     });
   }
 
-  return null;
+  replaceCandidates(deps.db, game.slug, seen, now());
+  return picked;
 }
 
 export async function runLetsplayOnce(deps: LetsplayDeps): Promise<LetsplayResult> {
@@ -137,7 +206,7 @@ export async function runLetsplayOnce(deps: LetsplayDeps): Promise<LetsplayResul
 
     try {
       const candidates = await deps.youtube.findCandidates(game.title);
-      const picked = candidates.length === 0 ? null : await pickVideo(deps, game, candidates, rejected, log);
+      const picked = candidates.length === 0 ? null : await pickVideo(deps, game, candidates, rejected, log, now);
 
       if (!picked) {
         // Различаем «ролики были, но все чужие или без речи» и «ничего не нашлось».
@@ -160,7 +229,7 @@ export async function runLetsplayOnce(deps: LetsplayDeps): Promise<LetsplayResul
           причины: rejected.map((r) => r.reason),
         });
       } else {
-        const conclusion = await deps.llm.concludeLetsplay(
+        const call = await deps.llm.concludeLetsplay(
           {
             title: game.title,
             developer: game.developer,
@@ -177,10 +246,24 @@ export async function runLetsplayOnce(deps: LetsplayDeps): Promise<LetsplayResul
           channel: picked.video.channel,
           views: picked.video.views,
           durationS: picked.video.durationS,
-          conclusion: JSON.stringify(conclusion),
+          conclusion: JSON.stringify(call.value),
           status: 'done',
           lastError: null,
         }, now());
+
+        recordRun(
+          db,
+          {
+            gameSlug: game.slug,
+            stage: 'letsplay_conclusion',
+            subject: picked.video.id,
+            meta: call.meta,
+            output: call.value,
+            decision: `заключение сохранено · ролик ${picked.video.id}`,
+          },
+          now(),
+        );
+
         result.done++;
         report.processed(WORKER);
       }

@@ -16,6 +16,7 @@ import {
 import { createDb, runMigrations, type DbHandle } from '../src/db/index.js';
 import { findGamesNeedingLetsplay, getLetsplay } from '../src/db/repo/letsplays.js';
 import { runLetsplayOnce } from '../src/workers/letsplay.js';
+import { asCall } from './llmCall.js';
 
 const log = pino({ level: 'silent' });
 
@@ -86,12 +87,12 @@ function fakes(opts: FakeOpts = {}) {
       const id = v.title.replace('Ролик ', '');
       judged.push(`${id}:${transcript.length}`);
       return Promise.resolve(
-        opts.verdicts?.[id] ?? { matches: true, confidence: 'high', reason: 'ок' },
+        asCall(opts.verdicts?.[id] ?? { matches: true, confidence: 'high', reason: 'ок' }),
       );
     },
     concludeLetsplay: (_g: unknown, v: { title: string }, transcript: string) => {
       concluded.push(`${v.title}:${transcript.length}`);
-      return Promise.resolve(CONCLUSION);
+      return Promise.resolve(asCall(CONCLUSION));
     },
   } as unknown as OpenRouterClient;
 

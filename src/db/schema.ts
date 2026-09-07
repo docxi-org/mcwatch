@@ -22,6 +22,14 @@ export const crawlPhase = ['landing', 'browse'] as const;
 export const jobStatus = ['queued', 'running', 'done', 'failed'] as const;
 export const workerState = ['idle', 'running', 'error'] as const;
 export const transcriptSource = ['captions', 'whisper'] as const;
+export const llmStage = [
+  'summary_critic',
+  'summary_user',
+  'embedding',
+  'letsplay_judge',
+  'letsplay_conclusion',
+] as const;
+export const llmRunStatus = ['ok', 'failed'] as const;
 export const letsplayStatus = [
   'pending',
   'no_video',
@@ -191,6 +199,77 @@ export const workerStatus = sqliteTable('worker_status', {
   lastError: text('last_error'),
 });
 
+/**
+ * Каждый вызов модели — строкой. Здесь и сырьё, и ответ, и что с ответом
+ * сделал код: карточка обязана уметь показать, из чего она получилась
+ * (`docs/ARCHITECTURE.md` §10). Оценка стоимости — именно оценка, по прайсу
+ * из конфига, а не факт от провайдера.
+ */
+export const llmRuns = sqliteTable(
+  'llm_runs',
+  {
+    id: integer('id').primaryKey({ autoIncrement: true }),
+    gameSlug: text('game_slug')
+      .notNull()
+      .references(() => games.slug, { onDelete: 'cascade' }),
+    stage: text('stage', { enum: llmStage }).notNull(),
+    /** Уточнение внутри этапа: идентификатор ролика у судьи. */
+    subject: text('subject'),
+    model: text('model').notNull(),
+    status: text('status', { enum: llmRunStatus }).notNull(),
+    attempts: integer('attempts').notNull().default(1),
+    durationMs: integer('duration_ms').notNull(),
+    promptTokens: integer('prompt_tokens'),
+    completionTokens: integer('completion_tokens'),
+    costUsd: real('cost_usd'),
+    /**
+     * Сколько игр обслужил один вызов. У эмбеддингов пачка общая, и делить
+     * её токены между играми значило бы придумывать точность.
+     */
+    batchSize: integer('batch_size').notNull().default(1),
+    /** Что ушло в модель, дословно. */
+    input: text('input').notNull(),
+    /** Что вернулось, как есть. */
+    output: text('output'),
+    /** Что с ответом сделал код — это не то же, что сам ответ. */
+    decision: text('decision').notNull(),
+    error: text('error'),
+    createdAt: integer('created_at', { mode: 'timestamp_ms' }).notNull().default(now),
+  },
+  (t) => [index('llm_runs_game_idx').on(t.gameSlug, t.id)],
+);
+
+/**
+ * Рассмотренные кандидаты в летсплеи — все, включая отбракованных. Раньше
+ * отказы жили строкой в журнале событий и исчезали при ротации, а вместе с
+ * ними исчезала причина, по которой ролик не взят.
+ */
+export const letsplayCandidates = sqliteTable(
+  'letsplay_candidates',
+  {
+    id: integer('id').primaryKey({ autoIncrement: true }),
+    gameSlug: text('game_slug')
+      .notNull()
+      .references(() => games.slug, { onDelete: 'cascade' }),
+    /** Место в выдаче по убыванию просмотров, с единицы. */
+    position: integer('position').notNull(),
+    videoId: text('video_id').notNull(),
+    title: text('title').notNull(),
+    channel: text('channel'),
+    views: integer('views'),
+    durationS: integer('duration_s'),
+    /** Расшифровка целиком; NULL — получить не удалось. */
+    transcript: text('transcript'),
+    matches: integer('matches', { mode: 'boolean' }),
+    confidence: text('confidence'),
+    reason: text('reason'),
+    /** Итог по кандидату словами: «взят», «отбракован», «нет расшифровки». */
+    outcome: text('outcome').notNull(),
+    createdAt: integer('created_at', { mode: 'timestamp_ms' }).notNull().default(now),
+  },
+  (t) => [unique('letsplay_candidates_game_video').on(t.gameSlug, t.videoId)],
+);
+
 export const eventsLog = sqliteTable(
   'events_log',
   {
@@ -214,4 +293,6 @@ export const schema = {
   jobs,
   workerStatus,
   eventsLog,
+  llmRuns,
+  letsplayCandidates,
 };

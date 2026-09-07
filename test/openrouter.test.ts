@@ -1,5 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
 import { MissingApiKeyError, OpenRouterClient } from '../src/clients/openrouter.js';
+import { EMBEDDING_DIMENSIONS } from '../src/config/models.js';
+import { truncateEmbedding } from '../src/clients/openrouter.js';
 
 /**
  * Клиент проверяется через подменённый `fetch`: сети нет. Интересует не ответ
@@ -65,11 +67,13 @@ describe('OpenRouterClient', () => {
 
     const client = new OpenRouterClient({ apiKey: 'k' });
 
-    await expect(client.summarizeReviews(input)).resolves.toEqual({
-      likes: ['раз'],
-      dislikes: ['два'],
-      summary: 'итог',
-    });
+    const call = await client.summarizeReviews(input);
+
+    expect(call.value).toEqual({ likes: ['раз'], dislikes: ['два'], summary: 'итог' });
+    // Метрики вызова нужны карточке конвейера — они приходят тем же ответом.
+    expect(call.meta).toMatchObject({ attempts: 1 });
+    // В `prompt` лежит то самое сырьё — отзывы, ушедшие в модель.
+    expect(call.meta.prompt).toContain('Отзывы');
   });
 
   it('каждая попытка получает СВОЙ таймаут, а не общий бюджет', async () => {
@@ -93,9 +97,11 @@ describe('OpenRouterClient', () => {
     const client = new OpenRouterClient({ apiKey: 'k', timeoutMs: 30, maxAttempts: 3 });
 
     // Раз вторая попытка успела — значит бюджет первой её не съел.
-    await expect(client.summarizeReviews(input)).resolves.toMatchObject({
-      summary: 'итог',
-    });
+    const result = await client.summarizeReviews(input);
+
+    expect(result.value).toMatchObject({ summary: 'итог' });
+    // Число попыток попадает в метрики: карточка конвейера показывает и это.
+    expect(result.meta.attempts).toBe(2);
     expect(signals.length).toBeGreaterThanOrEqual(2);
     expect(signals[0]).not.toBe(signals[1]);
   });
@@ -110,5 +116,23 @@ describe('OpenRouterClient', () => {
 
     await expect(client.summarizeReviews(input)).rejects.toThrow(/провайдер лёг/);
     expect(fetchImpl).toHaveBeenCalledTimes(2);
+  });
+});
+
+describe('эмбеддинги', () => {
+  it('усекаются до объявленной размерности своими руками', () => {
+    // Провайдер отдаёт родные 2560 — ровно это показала карточка конвейера
+    // 07.09.2026, хотя `providerOptions.dimensions` просил 1536.
+    const native = Array.from({ length: 2560 }, (_, i) => i / 2560);
+
+    const cut = truncateEmbedding(native);
+
+    expect(cut).toHaveLength(EMBEDDING_DIMENSIONS);
+    expect(cut[0]).toBe(0);
+    expect(cut[EMBEDDING_DIMENSIONS - 1]).toBeCloseTo(native[EMBEDDING_DIMENSIONS - 1] ?? 0, 6);
+  });
+
+  it('короткий вектор остаётся как есть, а не добивается нулями', () => {
+    expect(truncateEmbedding([1, 2, 3])).toHaveLength(3);
   });
 });

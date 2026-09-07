@@ -118,3 +118,79 @@ export interface PlatformDto {
 }
 
 export type SortKey = 'metascore' | 'userscore' | 'date' | 'title';
+
+/** Один вызов модели в цепочке — `docs/ARCHITECTURE.md` §10. */
+export interface PipelineRunDto {
+  id: number;
+  stage: string;
+  /** Уточнение внутри этапа: идентификатор ролика у судьи. */
+  subject: string | null;
+  model: string;
+  status: 'ok' | 'failed';
+  attempts: number;
+  durationMs: number;
+  promptTokens: number | null;
+  completionTokens: number | null;
+  /** Оценка по прайсу из конфига, не факт от провайдера. */
+  costUsd: number | null;
+  /** Сколько игр обслужил один вызов: у эмбеддингов пачка общая. */
+  batchSize: number;
+  /** Что код сделал с ответом — это не то же, что сам ответ. */
+  decision: string;
+  error: string | null;
+  createdAt: string;
+}
+
+export interface PipelineStageDto {
+  key:
+    | 'crawl'
+    | 'summary_critic'
+    | 'summary_user'
+    | 'embedding'
+    | 'similar'
+    | 'letsplay_search'
+    | 'letsplay_judge'
+    | 'letsplay_conclusion';
+  title: string;
+  /** `llm` — был вызов модели, `code` — детерминированный этап. */
+  kind: 'llm' | 'code';
+  /** `skipped` — этап не понадобился; это не ошибка. */
+  status: 'done' | 'skipped' | 'failed';
+  /** Однострочный итог для ленты этапов. */
+  summary: string;
+  runs: PipelineRunDto[];
+  /** Что показать у этапа без модели. */
+  facts: { key: string; value: string }[];
+}
+
+export interface PipelineCandidateDto {
+  position: number;
+  videoId: string;
+  title: string;
+  channel: string | null;
+  views: number | null;
+  durationS: number | null;
+  /** Длина расшифровки; `null` — получить её не удалось. */
+  transcriptChars: number | null;
+  matches: boolean | null;
+  confidence: string | null;
+  reason: string | null;
+  outcome: string;
+}
+
+export interface PipelineTotalsDto {
+  calls: number;
+  failed: number;
+  promptTokens: number;
+  completionTokens: number;
+  durationMs: number;
+  costUsd: number;
+}
+
+export interface PipelineDto {
+  slug: string;
+  title: string;
+  totals: PipelineTotalsDto;
+  stages: PipelineStageDto[];
+  candidates: PipelineCandidateDto[];
+}

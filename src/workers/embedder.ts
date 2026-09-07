@@ -1,5 +1,6 @@
 import type { Logger } from 'pino';
-import type { OpenRouterClient } from '../clients/openrouter.js';
+import { failedMeta, type OpenRouterClient } from '../clients/openrouter.js';
+import { EMBEDDING_MODEL } from '../config/models.js';
 import { componentLogger } from '../config/logger.js';
 import type { Db } from '../db/index.js';
 import {
@@ -7,6 +8,7 @@ import {
   saveEmbedding,
   type PendingEmbedding,
 } from '../db/repo/embeddings.js';
+import { recordRun } from '../db/repo/llmRuns.js';
 import { nullReporter, type Reporter } from './monitor.js';
 
 /**
@@ -27,6 +29,8 @@ export interface EmbedDeps {
   log?: Logger;
   batchSize?: number;
   reporter?: Reporter;
+  /** Часы. Отдельно — чтобы тесты не зависели от настоящего времени. */
+  now?: () => Date;
 }
 
 export interface EmbedResult {
@@ -56,6 +60,7 @@ function chunk<T>(items: T[], size: number): T[][] {
 
 export async function runEmbedOnce(deps: EmbedDeps): Promise<EmbedResult> {
   const { db, client } = deps;
+  const now = deps.now ?? ((): Date => new Date());
   const log = deps.log ?? componentLogger('embedder');
   const size = deps.batchSize ?? BATCH_SIZE;
   const report = deps.reporter ?? nullReporter;
@@ -76,14 +81,31 @@ export async function runEmbedOnce(deps: EmbedDeps): Promise<EmbedResult> {
     report.checked(WORKER, batch.length);
     report.item(WORKER, `пачка из ${batch.length}`);
     try {
-      const vectors = await client.embed(batch.map(embeddingTextOf));
+      const texts = batch.map(embeddingTextOf);
+      const call = await client.embed(texts);
 
       for (const [i, game] of batch.entries()) {
-        const vector = vectors[i];
+        const vector = call.value[i];
         if (!vector) continue;
         saveEmbedding(db, game.slug, vector);
         result.written++;
         report.processed(WORKER);
+
+        // Вызов был общий на всю пачку, но в карточке игры показывать надо её
+        // собственный текст. Токены и время при этом остаются пачечными —
+        // делить их между играми значило бы придумывать точность.
+        recordRun(
+          db,
+          {
+            gameSlug: game.slug,
+            stage: 'embedding',
+            meta: { ...call.meta, prompt: texts[i] ?? '' },
+            output: { dimensions: vector.length },
+            decision: `вектор сохранён · ${vector.length} чисел`,
+            batchSize: batch.length,
+          },
+          now(),
+        );
       }
       log.debug({ slugs }, 'пачка эмбеддингов сохранена');
     } catch (err) {
@@ -93,6 +115,22 @@ export async function runEmbedOnce(deps: EmbedDeps): Promise<EmbedResult> {
       report.failed(WORKER, batch.length);
       report.log(WORKER, 'warn', 'пачка не посчитана', { slugs, error: message });
       log.warn({ err, slugs }, 'пачка не посчитана, идём дальше');
+
+      for (const game of batch) {
+        recordRun(
+          db,
+          {
+            gameSlug: game.slug,
+            stage: 'embedding',
+            meta: { ...failedMeta(EMBEDDING_MODEL), prompt: embeddingTextOf(game) },
+            output: null,
+            decision: 'вектор не посчитан, игра осталась без похожих',
+            error: message,
+            batchSize: batch.length,
+          },
+          now(),
+        );
+      }
     }
   }
 

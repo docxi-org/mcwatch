@@ -11,6 +11,7 @@ import {
   LETSPLAY_MODEL,
   SUMMARY_LIMITS,
   SUMMARY_MODEL,
+  estimateCostUsd,
 } from '../config/models.js';
 import type { Review, ReviewKind } from './metacritic/index.js';
 
@@ -139,6 +140,80 @@ const SYSTEM_PROMPT = [
   'Название игры не переводи.',
 ].join(' ');
 
+/** Расход токенов, приведённый к одной форме для чата и эмбеддингов. */
+export interface TokenUsage {
+  inputTokens: number | null;
+  outputTokens: number | null;
+}
+
+/**
+ * Метрики одного вызова. Нужны карточке конвейера: она показывает не только
+ * ответ, но и то, как он был получен (`docs/ARCHITECTURE.md` §10).
+ */
+export interface CallMeta {
+  model: string;
+  /** Сколько попыток понадобилось, включая удачную. */
+  attempts: number;
+  durationMs: number;
+  promptTokens: number | null;
+  completionTokens: number | null;
+  /** Оценка по прайсу из конфига, не факт от провайдера. */
+  costUsd: number | null;
+  /** Постоянная часть запроса. */
+  system: string;
+  /** Переменная часть запроса — то самое «сырьё». */
+  prompt: string;
+}
+
+export interface LlmCall<T> {
+  value: T;
+  meta: CallMeta;
+}
+
+/** Расход у SDK описан по-разному для чата и эмбеддингов; сводим к одному. */
+function tokensOf(usage: {
+  inputTokens?: number | undefined;
+  outputTokens?: number | undefined;
+}): TokenUsage {
+  return {
+    inputTokens: usage.inputTokens ?? null,
+    outputTokens: usage.outputTokens ?? null,
+  };
+}
+
+/**
+ * Усечение эмбеддинга до объявленной размерности. Делается своими руками:
+ * `providerOptions.dimensions` OpenRouter молча игнорирует — 07.09.2026
+ * карточка конвейера показала 2560 чисел там, где конфиг обещает 1536.
+ * Модель матрёшечная, поэтому первые N координат — законный вектор меньшей
+ * размерности, а косинус нормирует длину сам.
+ */
+export function truncateEmbedding(values: number[]): Float32Array {
+  return Float32Array.from(values.slice(0, EMBEDDING_DIMENSIONS));
+}
+
+/**
+ * Метрики вызова, который не состоялся или сорвался. Запись о сбое нужна в
+ * журнале не меньше удачной: иначе пропавший этап выглядит несделанным.
+ */
+export function failedMeta(model: string): CallMeta {
+  return emptyMeta(model);
+}
+
+/** Метрики несостоявшегося вызова: пустая пачка эмбеддингов никуда не ходит. */
+function emptyMeta(model: string): CallMeta {
+  return {
+    model,
+    attempts: 0,
+    durationMs: 0,
+    promptTokens: null,
+    completionTokens: null,
+    costUsd: null,
+    system: '',
+    prompt: '',
+  };
+}
+
 export interface SummarizeInput {
   title: string;
   kind: ReviewKind;
@@ -207,7 +282,7 @@ export class OpenRouterClient {
    * Резюме одной группы отзывов. Считается по отзывам всех платформ разом —
    * решение владельца 07.09.2026, см. §4.1.
    */
-  async summarizeReviews(input: SummarizeInput): Promise<ReviewSummary> {
+  async summarizeReviews(input: SummarizeInput): Promise<LlmCall<ReviewSummary>> {
     const corpus = input.reviews
       .map((r, i) => {
         const score = r.score === null ? 'без оценки' : `${r.score}/${r.scoreMax}`;
@@ -217,7 +292,37 @@ export class OpenRouterClient {
       .join('\n');
 
     const prompt = `Отзывы ${KIND_NAME[input.kind]} об игре «${input.title}»:\n\n${corpus}`;
-    return this.withRetries(() => this.generateOnce(prompt));
+    return this.measured(SYSTEM_PROMPT, prompt, this.model, () => this.generateOnce(prompt));
+  }
+
+  /**
+   * Обёртка, которая считает то, чего не видно из ответа: сколько было
+   * попыток, сколько это заняло и что именно ушло в модель. Без этих чисел
+   * карточка конвейера не может показать «процесс работы модели» (§10).
+   */
+  private async measured<T>(
+    system: string,
+    prompt: string,
+    model: string,
+    attempt: () => Promise<{ value: T; usage: TokenUsage }>,
+  ): Promise<LlmCall<T>> {
+    const startedAt = Date.now();
+    const { value, attempts } = await this.withRetries(attempt);
+    const { inputTokens, outputTokens } = value.usage;
+
+    return {
+      value: value.value,
+      meta: {
+        model,
+        attempts,
+        durationMs: Date.now() - startedAt,
+        promptTokens: inputTokens,
+        completionTokens: outputTokens,
+        costUsd: estimateCostUsd(model, inputTokens, outputTokens),
+        system,
+        prompt,
+      },
+    };
   }
 
   /**
@@ -226,12 +331,14 @@ export class OpenRouterClient {
    * зависшая съедает весь бюджет и повторов не происходит — на этом одна игра
    * падала стабильно, хотя вручную считалась за пять секунд.
    */
-  private async withRetries<T>(attempt: () => Promise<T>): Promise<T> {
+  private async withRetries<T>(
+    attempt: () => Promise<T>,
+  ): Promise<{ value: T; attempts: number }> {
     let lastErr: unknown;
 
     for (let i = 1; i <= this.maxAttempts; i++) {
       try {
-        return await attempt();
+        return { value: await attempt(), attempts: i };
       } catch (err) {
         lastErr = err;
         if (i === this.maxAttempts) break;
@@ -250,23 +357,25 @@ export class OpenRouterClient {
     game: GameInfo,
     video: VideoInfo,
     transcript: string,
-  ): Promise<VideoMatch> {
-    const { output } = await this.withRetries(() =>
-      generateText({
+  ): Promise<LlmCall<VideoMatch>> {
+    const prompt = [
+      `ИГРА\n${gameBlock(game)}`,
+      `РОЛИК\nНазвание: ${video.title}\nКанал: ${video.channel ?? '—'}`,
+      `РАСШИФРОВКА РЕЧИ АВТОРА (${transcript.length} знаков)\n${transcript}`,
+    ].join('\n\n');
+
+    return this.measured(JUDGE_PROMPT, prompt, this.letsplayModel, async () => {
+      const { output, usage } = await generateText({
         model: this.provider.chat(this.letsplayModel),
         output: Output.object({ schema: videoMatchSchema }),
         system: JUDGE_PROMPT,
-        prompt: [
-          `ИГРА\n${gameBlock(game)}`,
-          `РОЛИК\nНазвание: ${video.title}\nКанал: ${video.channel ?? '—'}`,
-          `РАСШИФРОВКА РЕЧИ АВТОРА (${transcript.length} знаков)\n${transcript}`,
-        ].join('\n\n'),
+        prompt,
         providerOptions: { openrouter: { reasoning: { enabled: false } } },
         abortSignal: AbortSignal.timeout(this.letsplayTimeoutMs),
         maxRetries: 0,
-      }),
-    );
-    return output;
+      });
+      return { value: output, usage: tokensOf(usage) };
+    });
   }
 
   /** Заключение по летсплею: пересказ впечатления автора, не наш обзор. */
@@ -274,53 +383,73 @@ export class OpenRouterClient {
     game: GameInfo,
     video: VideoInfo,
     transcript: string,
-  ): Promise<LetsplayConclusion> {
-    const { output } = await this.withRetries(() =>
-      generateText({
+  ): Promise<LlmCall<LetsplayConclusion>> {
+    const prompt = [
+      `ИГРА: ${game.title}`,
+      `РОЛИК: ${video.title} (канал ${video.channel ?? '—'})`,
+      `РАСШИФРОВКА РЕЧИ АВТОРА\n${transcript}`,
+    ].join('\n\n');
+
+    return this.measured(CONCLUSION_PROMPT, prompt, this.letsplayModel, async () => {
+      const { output, usage } = await generateText({
         model: this.provider.chat(this.letsplayModel),
         output: Output.object({ schema: letsplayConclusionSchema }),
         system: CONCLUSION_PROMPT,
-        prompt: [
-          `ИГРА: ${game.title}`,
-          `РОЛИК: ${video.title} (канал ${video.channel ?? '—'})`,
-          `РАСШИФРОВКА РЕЧИ АВТОРА\n${transcript}`,
-        ].join('\n\n'),
+        prompt,
         providerOptions: { openrouter: { reasoning: { enabled: false } } },
         abortSignal: AbortSignal.timeout(this.timeoutMs),
         maxRetries: 0,
-      }),
-    );
-    return output;
+      });
+      return { value: output, usage: tokensOf(usage) };
+    });
   }
 
   /**
    * Эмбеддинги пачкой. Размерность усечённая: модель матрёшечная, 1536 из
    * родных 2560 (§4). Порядок ответа соответствует порядку входа.
    */
-  async embed(texts: string[]): Promise<Float32Array[]> {
-    if (texts.length === 0) return [];
-
-    const { embeddings } = await this.withRetries(() =>
-      embedMany({
-        model: this.provider.textEmbeddingModel(this.embeddingModel),
-        values: texts,
-        providerOptions: { openrouter: { dimensions: EMBEDDING_DIMENSIONS } },
-        // Тот же порядок, что и у резюме: свой таймаут на каждую попытку.
-        abortSignal: AbortSignal.timeout(this.timeoutMs),
-        maxRetries: 0,
-      }),
-    );
-
-    if (embeddings.length !== texts.length) {
-      throw new Error(
-        `OpenRouter вернул ${embeddings.length} эмбеддингов на ${texts.length} текстов`,
-      );
+  async embed(texts: string[]): Promise<LlmCall<Float32Array[]>> {
+    if (texts.length === 0) {
+      return { value: [], meta: emptyMeta(this.embeddingModel) };
     }
-    return embeddings.map((e) => Float32Array.from(e));
+
+    return this.measured(
+      '',
+      texts.join('\n---\n'),
+      this.embeddingModel,
+      async () => {
+        const { embeddings, usage } = await embedMany({
+          model: this.provider.textEmbeddingModel(this.embeddingModel),
+          values: texts,
+          providerOptions: { openrouter: { dimensions: EMBEDDING_DIMENSIONS } },
+          // Тот же порядок, что и у резюме: свой таймаут на каждую попытку.
+          abortSignal: AbortSignal.timeout(this.timeoutMs),
+          maxRetries: 0,
+        });
+
+        if (embeddings.length !== texts.length) {
+          throw new Error(
+            `OpenRouter вернул ${embeddings.length} эмбеддингов на ${texts.length} текстов`,
+          );
+        }
+        return {
+          // Усечение делаем сами. `providerOptions.dimensions` OpenRouter
+          // молча игнорирует: 07.09.2026 карточка конвейера показала 2560
+          // чисел там, где конфиг обещает 1536. Модель матрёшечная, поэтому
+          // первые N координат — законный вектор меньшей размерности, а
+          // косинус нормирует длину сам.
+          value: embeddings.map(truncateEmbedding),
+          // У эмбеддингов расход общий на пачку, выхода нет.
+          usage: { inputTokens: usage.tokens, outputTokens: null },
+        };
+      },
+    );
   }
 
-  private async generateOnce(prompt: string): Promise<ReviewSummary> {
-    const { output } = await generateText({
+  private async generateOnce(
+    prompt: string,
+  ): Promise<{ value: ReviewSummary; usage: TokenUsage }> {
+    const { output, usage } = await generateText({
       model: this.provider.chat(this.model),
       output: Output.object({ schema: summarySchema }),
       system: SYSTEM_PROMPT,
@@ -334,6 +463,6 @@ export class OpenRouterClient {
       maxRetries: 0,
     });
 
-    return output;
+    return { value: output, usage: tokensOf(usage) };
   }
 }

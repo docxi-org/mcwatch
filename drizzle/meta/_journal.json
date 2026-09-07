@@ -15,6 +15,13 @@
       "when": 1788771939549,
       "tag": "0001_past_ezekiel",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "6",
+      "when": 1788777127902,
+      "tag": "0002_amazing_riptide",
+      "breakpoints": true
     }
   ]
 }
