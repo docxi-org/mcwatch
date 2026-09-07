@@ -88,6 +88,7 @@ pnpm build          # фронт + бэкенд
 pnpm check          # typecheck + lint + test  ← гейт
 pnpm test:live      # сетевые тесты (вручную)
 pnpm crawl --once   # один цикл сбора
+pnpm summarize --once  # один прогон резюме отзывов
 pnpm db:migrate
 ```
 

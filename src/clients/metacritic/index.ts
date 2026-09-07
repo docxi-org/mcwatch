@@ -38,8 +38,9 @@ export function metacriticUserAgent(contact = env.CONTACT_EMAIL): string {
 }
 
 /**
- * Верхняя граница отзывов за обход по видам — числа из `ARCHITECTURE` §4.1.
- * Разные не случайно: отзывов пользователей больше, но они длиннее и шумнее.
+ * Верхняя граница отзывов на один вызов по видам. Хранить больше, чем уйдёт
+ * модели, — намеренно: полные отзывы нужны интерфейсу и счётчикам, а выборку
+ * для модели делает `workers/selectReviews.ts`.
  */
 export const DEFAULT_MAX_REVIEWS: Record<ReviewKind, number> = {
   critic: 40,
@@ -47,8 +48,11 @@ export const DEFAULT_MAX_REVIEWS: Record<ReviewKind, number> = {
 };
 
 export interface MetacriticClientOptions {
-  http?: HttpClient;
+  /** Потолок на ОДИН вызов `listReviews`, не на игру: у игры платформ бывает
+   *  несколько, и каждая обходится отдельно. Сколько отзывов уходит модели —
+   *  решает `workers/selectReviews.ts` по §4.1. */
   maxReviews?: Partial<Record<ReviewKind, number>>;
+  http?: HttpClient;
 }
 
 /**

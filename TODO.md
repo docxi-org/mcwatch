@@ -9,7 +9,7 @@
 - [x] G1 · `clients/metacritic`: списки, карточка, отзывы, rate-limit, UA, тесты на фикстурах — **сделано 2026-09-07**, см. `READY.md`
 - [x] G1 · Воркер `crawler` + `crawl_state` + `pnpm crawl --once` — **сделано 2026-09-07**, см. `READY.md`. **Гейт G1 пройден**
 - [x] G2 · Сбор отзывов в `crawler`: критики и пользователи раздельно — **сделано 2026-09-07**, см. `READY.md`
-- [ ] G2 · `clients/openrouter` (AI SDK) + воркер `summarizer` с правилом обновления
+- [x] G2 · `clients/openrouter` (AI SDK) + воркер `summarizer` с правилом обновления — **сделано 2026-09-07**, см. `READY.md`
 - [ ] G2 · Эмбеддинги + похожие игры в `GET /api/games/:slug`
 - [ ] G3 · API списка/карточки/платформ; фронт Vue из Claude Design — список, карточка, фильтр, поиск, сортировка, похожие
 - [ ] G4 · Dockerfile, compose, Caddy, деплой на VPS, планировщик раз в час

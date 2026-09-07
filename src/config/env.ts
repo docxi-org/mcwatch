@@ -1,3 +1,5 @@
+import { existsSync } from 'node:fs';
+import { resolve } from 'node:path';
 import { z } from 'zod';
 
 /**
@@ -20,7 +22,19 @@ const envSchema = z.object({
 
 export type Env = z.infer<typeof envSchema>;
 
+/**
+ * Подхватывает `.env`, если он есть. Штатное средство Node, без зависимости.
+ * Уже заданные переменные окружения не перезаписываются — значит в Docker и CI
+ * настоящее окружение выигрывает у файла, а файл остаётся удобством разработки.
+ */
+function loadDotEnvIfPresent(): void {
+  const path = resolve(process.cwd(), '.env');
+  if (existsSync(path)) process.loadEnvFile(path);
+}
+
 function load(): Env {
+  loadDotEnvIfPresent();
+
   const parsed = envSchema.safeParse(process.env);
   if (!parsed.success) {
     const issues = parsed.error.issues
