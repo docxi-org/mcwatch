@@ -8,10 +8,10 @@
   },
   "packageManager": "pnpm@9.15.9",
   "scripts": {
-    "dev": "tsx watch src/server/index.ts",
-    "build": "tsc -p tsconfig.build.json",
+    "dev": "node scripts/dev.js",
+    "build": "pnpm build:web && tsc -p tsconfig.build.json",
     "start": "node dist/server/index.js",
-    "typecheck": "tsc --noEmit",
+    "typecheck": "tsc --noEmit && vue-tsc --noEmit -p web/tsconfig.json",
     "lint": "eslint .",
     "test": "vitest run",
     "test:live": "vitest run --config vitest.live.config.ts",
@@ -21,7 +21,10 @@
     "crawl": "tsx src/cli/crawl.ts",
     "summarize": "tsx src/cli/summarize.ts",
     "embed": "tsx src/cli/embed.ts",
-    "letsplay": "tsx src/cli/letsplay.ts"
+    "letsplay": "tsx src/cli/letsplay.ts",
+    "dev:api": "tsx watch src/server/index.ts",
+    "dev:web": "vite",
+    "build:web": "vite build"
   },
   "dependencies": {
     "@hono/node-server": "^2.1.1",
@@ -39,12 +42,20 @@
     "@eslint/js": "^10.0.1",
     "@types/better-sqlite3": "^9.6.0",
     "@types/node": "^26.4.1",
+    "@vitejs/plugin-vue": "^6.0.8",
     "drizzle-kit": "^0.31.10",
     "eslint": "^10.10.0",
+    "eslint-plugin-vue": "^10.11.0",
+    "globals": "^17.12.0",
     "pino-pretty": "^13.1.3",
     "tsx": "^4.23.13",
     "typescript": "^5.9.3",
     "typescript-eslint": "^8.69.0",
-    "vitest": "^5.0.0"
+    "vite": "^8.2.2",
+    "vitest": "^5.0.0",
+    "vue": "^3.5.42",
+    "vue-eslint-parser": "^10.4.1",
+    "vue-router": "^5.3.1",
+    "vue-tsc": "^3.3.11"
   }
 }

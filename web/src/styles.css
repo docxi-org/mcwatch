@@ -1,0 +1,236 @@
+/*
+ * Токены и база. Палитра, шрифты и радиусы — из `ui/Спека.dc.html`:
+ * акцент холодный, зелёный/жёлтый/красный заняты градацией оценок и в
+ * других ролях не участвуют.
+ */
+
+:root {
+  --bg: #0c0c0d;
+  --surface: #141417;
+  --surface-2: #1a1a1e;
+  --surface-3: #191a1e;
+  --border: #232328;
+  --border-strong: #2c2c33;
+  --border-hover: #3d3d45;
+  --text: #edeef0;
+  --text-2: #d5d6db;
+  --text-3: #a9aab1;
+  --muted: #8b8b93;
+  --muted-2: #74747c;
+  --muted-3: #5f5f67;
+
+  --accent: oklch(0.78 0.13 205);
+  --accent-hi: oklch(0.88 0.1 205);
+  --good: oklch(0.72 0.19 145);
+  --mixed: oklch(0.82 0.16 92);
+  --bad: oklch(0.64 0.21 25);
+  --bad-hi: oklch(0.75 0.16 25);
+
+  --r-sm: 6px;
+  --r-md: 9px;
+  --r-lg: 11px;
+
+  --mono: 'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, monospace;
+  --sans: 'Sora', system-ui, -apple-system, 'Segoe UI', sans-serif;
+
+  color-scheme: dark;
+}
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  margin: 0;
+  padding: 0;
+  background: var(--bg);
+}
+
+body {
+  font-family: var(--sans);
+  color: var(--text);
+  -webkit-font-smoothing: antialiased;
+}
+
+h1,
+h2,
+h3,
+p {
+  margin: 0;
+}
+
+a {
+  color: var(--accent);
+  text-decoration: none;
+}
+
+a:hover {
+  color: var(--accent-hi);
+}
+
+::selection {
+  background: var(--accent);
+  color: var(--bg);
+}
+
+/* Обводка только для клавиатуры: наведение и фокус — разные состояния. */
+:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 3px;
+  border-radius: 4px;
+}
+
+input,
+select,
+button,
+textarea {
+  font-family: inherit;
+}
+
+input::placeholder {
+  color: #6a6a70;
+}
+
+button {
+  cursor: pointer;
+}
+
+button[disabled] {
+  cursor: not-allowed;
+}
+
+/* Штриховка под обложками и заглушками: место занято, картинки нет. */
+.hatch {
+  background-image: repeating-linear-gradient(
+    135deg,
+    rgba(255, 255, 255, 0.045) 0 1px,
+    transparent 1px 7px
+  );
+}
+
+.noscroll::-webkit-scrollbar {
+  height: 6px;
+}
+
+.noscroll::-webkit-scrollbar-thumb {
+  background: #2c2c31;
+  border-radius: 3px;
+}
+
+.mono {
+  font-family: var(--mono);
+}
+
+.shell {
+  width: 100%;
+  max-width: 1280px;
+  margin: 0 auto;
+  padding: 0 16px;
+}
+
+/* Пустое состояние: пунктир, объяснение, а не молчаливая пустота. */
+.empty {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 26px 20px;
+  border: 1px dashed var(--border-strong);
+  border-radius: var(--r-lg);
+}
+
+.empty__title {
+  font-size: 15px;
+  font-weight: 600;
+}
+
+.empty__note {
+  font-size: 13.5px;
+  color: var(--muted);
+  line-height: 1.55;
+  max-width: 60ch;
+  text-wrap: pretty;
+}
+
+.section {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.section__head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.section__title {
+  font-size: 17px;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+}
+
+.section__note {
+  font-family: var(--mono);
+  font-size: 10px;
+  color: var(--muted-3);
+}
+
+.btn {
+  min-height: 44px;
+  padding: 0 18px;
+  border-radius: var(--r-md);
+  border: 1px solid #35353d;
+  background: #1c1c21;
+  color: var(--text);
+  font-size: 13.5px;
+}
+
+.btn:hover {
+  border-color: var(--accent);
+}
+
+.btn--primary {
+  border-color: var(--accent);
+  background: var(--accent);
+  color: var(--bg);
+  font-weight: 600;
+}
+
+.btn--primary:hover {
+  background: var(--accent-hi);
+  border-color: var(--accent-hi);
+}
+
+@keyframes shine {
+  0% {
+    background-position: 100% 0;
+  }
+  100% {
+    background-position: -100% 0;
+  }
+}
+
+@keyframes pulse {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.35;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+  }
+}
